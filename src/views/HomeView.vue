@@ -2,7 +2,6 @@
   <div class="home-page">
     <h1 class="page-title">當前任務</h1>
 
-    <!-- 當前任務 -->
     <section class="task-section">
       <p v-if="loading" class="status-text">載入中...</p>
       <p v-else-if="error" class="error-text">{{ error }}</p>
@@ -27,12 +26,11 @@
       <div v-else class="task-card current-task-card empty-task-card">
         <h2 class="task-title big-task-title">目前沒有任務</h2>
         <p class="empty-text">請直接在下方新增下一個任務</p>
-        <p class="empty-text">空白超過 {{ idleReminderMinutes }} 分鐘會提醒你</p>
+        <p class="empty-text">空白超過 {{ idleReminderMinutes }} 分鐘會由 LINE 推播提醒你</p>
         <p v-if="idleSinceText" class="empty-text">空白起始：{{ idleSinceText }}</p>
       </div>
     </section>
 
-    <!-- 建立任務 -->
     <section class="create-card">
       <h2>建立任務</h2>
 
@@ -72,7 +70,6 @@
       </button>
     </section>
 
-    <!-- 提醒設定 -->
     <section class="setting-card">
       <h2>提醒設定</h2>
 
@@ -111,7 +108,6 @@
       </button>
     </section>
 
-    <!-- 歷史紀錄 -->
     <section class="history-card">
       <div class="top-bar">
         <h2>歷史紀錄（1 個月）</h2>
@@ -141,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Timestamp } from 'firebase/firestore'
 import { getLiffProfile } from '../liff'
 import {
@@ -158,7 +154,6 @@ import {
   parseDurationInput,
   formatDateTime,
   durationMinutesToText,
-  isInSleepTime,
 } from '../utils/taskTime'
 
 const loading = ref(true)
@@ -183,8 +178,6 @@ const idleReminderMinutes = ref(30)
 const sleepStart = ref('2300')
 const sleepEnd = ref('0700')
 const idleSinceText = ref('')
-
-let reminderTimer = null
 
 function clearMessage() {
   successText.value = ''
@@ -354,44 +347,6 @@ async function saveReminderSettings() {
   }
 }
 
-async function checkIdleReminder() {
-  try {
-    if (currentTask.value) return
-    if (!currentUserId.value) return
-
-    const user = await getUserProfile(currentUserId.value)
-    if (!user?.idleSince?.toDate) return
-
-    const now = new Date()
-    const idleSince = user.idleSince.toDate()
-    const minutes = Math.floor((now.getTime() - idleSince.getTime()) / 60000)
-
-    const reminderMinutes = Number(user.idleReminderMinutes || idleReminderMinutes.value || 30)
-    const start = user.sleepStart || sleepStart.value || '2300'
-    const end = user.sleepEnd || sleepEnd.value || '0700'
-
-    if (isInSleepTime(now, start, end)) return
-    if (minutes < reminderMinutes) return
-
-    const lastReminder = user.lastReminderAt?.toDate ? user.lastReminderAt.toDate() : null
-    if (lastReminder) {
-      const diff = Math.floor((now.getTime() - lastReminder.getTime()) / 60000)
-      if (diff < reminderMinutes) return
-    }
-
-    alert(`你已經空白超過 ${reminderMinutes} 分鐘，請輸入下一個任務。`)
-
-    await updateUserIdleState(currentUserId.value, {
-      lastReminderAt: Timestamp.now(),
-      idleReminderMinutes: reminderMinutes,
-      sleepStart: start,
-      sleepEnd: end,
-    })
-  } catch (err) {
-    console.error(err)
-  }
-}
-
 async function exportHistoryAsText() {
   try {
     exporting.value = true
@@ -435,13 +390,6 @@ async function exportHistoryAsText() {
 
 onMounted(async () => {
   await loadCurrentTask()
-  reminderTimer = setInterval(checkIdleReminder, 60000)
-})
-
-onBeforeUnmount(() => {
-  if (reminderTimer) {
-    clearInterval(reminderTimer)
-  }
 })
 </script>
 
