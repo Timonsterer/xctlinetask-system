@@ -1,496 +1,434 @@
 <template>
-  <div class="home-page">
-    <header class="hero-card">
-      <div class="hero-left">
-        <p class="hello-text">嗨，{{ displayName }}</p>
-        <h1>當前任務</h1>
-        <p class="hero-desc">只專注下一件最重要的事</p>
+  <div class="bind-page">
+    <div class="bind-card">
+      <h1>LINE 綁定</h1>
+      <p class="desc">先取得 LINE 身分，才能進入系統</p>
+
+      <div v-if="loading" class="status-box">
+        <div class="status-text">綁定中...</div>
       </div>
 
-      <div class="hero-right">
-        <button class="ghost-btn" @click="goBind">個人資料</button>
-      </div>
-    </header>
+      <div v-else>
+        <div v-if="error" class="alert error">{{ error }}</div>
+        <div v-if="success" class="alert success">{{ success }}</div>
 
-    <section class="current-task-card">
-      <div class="section-head">
-        <h2>現在要做的事</h2>
-        <button class="small-btn" @click="loadCurrentTask" :disabled="loadingTask">
-          {{ loadingTask ? '讀取中...' : '重新整理' }}
-        </button>
-      </div>
-
-      <div v-if="loadingTask" class="task-box empty-box">
-        載入中...
-      </div>
-
-      <div v-else-if="currentTask" class="task-box">
-        <div class="task-main">
-          <h3>{{ currentTask.title || '未命名任務' }}</h3>
-          <p v-if="currentTask.note" class="task-note">{{ currentTask.note }}</p>
-        </div>
-
-        <div class="task-meta">
-          <div class="meta-item">
-            <span>開始時間</span>
-            <strong>{{ formatDateTime(currentTask.startAt || currentTask.scheduledAt) }}</strong>
-          </div>
-
-          <div class="meta-item">
-            <span>結束時間</span>
-            <strong>{{ formatDateTime(currentTask.endAt) }}</strong>
-          </div>
-
-          <div class="meta-item">
-            <span>狀態</span>
-            <strong>{{ statusLabel(currentTask.status) }}</strong>
+        <div v-if="profile" class="profile-box">
+          <img
+            v-if="profile.pictureUrl"
+            :src="profile.pictureUrl"
+            alt="avatar"
+            class="avatar"
+          />
+          <div class="profile-info">
+            <div class="name">{{ profile.displayName || 'LINE 使用者' }}</div>
+            <div class="user-id">userId：{{ userId }}</div>
           </div>
         </div>
 
-        <div class="task-actions">
-          <button class="primary-btn" @click="goTaskNew">新增任務</button>
-          <button
-            class="success-btn"
-            @click="completeTask(currentTask.id)"
-            :disabled="finishingTask"
-          >
-            {{ finishingTask ? '處理中...' : '完成這個任務' }}
+        <form v-if="userId" class="form" @submit.prevent="handleSave">
+          <div class="form-group">
+            <label for="name">顯示名稱</label>
+            <input
+              id="name"
+              v-model.trim="form.name"
+              type="text"
+              placeholder="請輸入顯示名稱"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="nickname">暱稱</label>
+            <input
+              id="nickname"
+              v-model.trim="form.nickname"
+              type="text"
+              placeholder="可不填"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="occupation">身分 / 職業</label>
+            <input
+              id="occupation"
+              v-model.trim="form.occupation"
+              type="text"
+              placeholder="例如：上班族 / 自由工作者 / 業務"
+            />
+          </div>
+
+          <button class="btn primary" type="submit" :disabled="saving || !userId">
+            {{ saving ? '儲存中...' : '完成綁定' }}
+          </button>
+        </form>
+
+        <div v-else class="status-box">
+          <div class="status-text">尚未取得 LINE 身分</div>
+          <button class="btn primary" @click="handleManualLogin">
+            重新登入 LINE
           </button>
         </div>
       </div>
-
-      <div v-else class="task-box empty-box">
-        <p>目前沒有任務</p>
-        <button class="primary-btn" @click="goTaskNew">立即新增任務</button>
-      </div>
-    </section>
-
-    <section class="menu-section">
-      <div class="section-head">
-        <h2>功能入口</h2>
-      </div>
-
-      <div class="menu-grid">
-        <button class="menu-card" @click="goTaskNew">
-          <div class="menu-title">新增任務</div>
-          <div class="menu-desc">建立下一個要做的事</div>
-        </button>
-
-        <button class="menu-card" @click="goTaskHistory">
-          <div class="menu-title">任務紀錄</div>
-          <div class="menu-desc">查看完成與過往任務</div>
-        </button>
-
-        <button class="menu-card" @click="goIdleForm">
-          <div class="menu-title">我很閒設定</div>
-          <div class="menu-desc">設定你現在可被邀請</div>
-        </button>
-
-        <button class="menu-card" @click="goIdleMarket">
-          <div class="menu-title">我很閒市場</div>
-          <div class="menu-desc">看看現在誰有空</div>
-        </button>
-
-        <button class="menu-card" @click="goContacts">
-          <div class="menu-title">聯絡人列表</div>
-          <div class="menu-desc">管理客戶、朋友、合作對象</div>
-        </button>
-
-        <button class="menu-card" @click="goLifeTemplates">
-          <div class="menu-title">人物套版列表</div>
-          <div class="menu-desc">挑一個你想模仿的模式</div>
-        </button>
-      </div>
-    </section>
-
-    <p v-if="errorMessage" class="error-msg">{{ errorMessage }}</p>
-    <p v-if="successMessage" class="success-msg">{{ successMessage }}</p>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  collection,
-  doc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc
-} from 'firebase/firestore'
+import liff from '@line/liff'
 import { db } from '@/firebase'
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 
 const router = useRouter()
 
-const loadingTask = ref(false)
-const finishingTask = ref(false)
-const currentTask = ref(null)
-const errorMessage = ref('')
-const successMessage = ref('')
+const loading = ref(true)
+const saving = ref(false)
+const error = ref('')
+const success = ref('')
+const userId = ref('')
+const profile = ref(null)
 
-const userId =
-  localStorage.getItem('userId') ||
-  localStorage.getItem('lineUserId') ||
-  localStorage.getItem('line_user_id') ||
-  ''
-
-const displayName = computed(() => {
-  return (
-    localStorage.getItem('name') ||
-    localStorage.getItem('displayName') ||
-    localStorage.getItem('nickname') ||
-    '使用者'
-  )
+const form = reactive({
+  name: '',
+  nickname: '',
+  occupation: '',
 })
 
-function goBind() {
-  router.push('/bind')
+const LIFF_ID =
+  import.meta.env.VITE_LIFF_ID ||
+  import.meta.env.VITE_LINE_LIFF_ID ||
+  ''
+
+const LOGIN_LOCK_KEY = 'line_login_redirecting'
+const LOGIN_LOCK_TIME_KEY = 'line_login_redirecting_at'
+const LOCAL_USER_KEY = 'userId'
+
+const resetMessage = () => {
+  error.value = ''
+  success.value = ''
 }
 
-function goTaskNew() {
-  router.push('/task/new')
-}
+const saveLocalUser = (id, profileData = null) => {
+  localStorage.setItem('userId', id)
+  localStorage.setItem('lineUserId', id)
+  localStorage.setItem('line_user_id', id)
 
-function goTaskHistory() {
-  router.push('/task/history')
-}
+  if (profileData?.displayName) {
+    localStorage.setItem('displayName', profileData.displayName)
+  }
 
-function goIdleForm() {
-  router.push('/idle')
-}
-
-function goIdleMarket() {
-  router.push('/idle/market')
-}
-
-function goContacts() {
-  router.push('/contacts')
-}
-
-function goLifeTemplates() {
-  router.push('/life-templates')
-}
-
-function formatDateTime(value) {
-  if (!value) return '-'
-
-  const date = value?.toDate ? value.toDate() : new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  const hh = String(date.getHours()).padStart(2, '0')
-  const mm = String(date.getMinutes()).padStart(2, '0')
-
-  return `${y}-${m}-${d} ${hh}:${mm}`
-}
-
-function getTime(value) {
-  if (!value) return Number.MAX_SAFE_INTEGER
-  if (value?.toDate) return value.toDate().getTime()
-
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? Number.MAX_SAFE_INTEGER : d.getTime()
-}
-
-function statusLabel(status) {
-  if (status === 'pending') return '待處理'
-  if (status === 'doing') return '進行中'
-  if (status === 'done') return '已完成'
-  return status || '-'
-}
-
-async function loadCurrentTask() {
-  loadingTask.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
-
-  try {
-    if (!userId) {
-      errorMessage.value = '找不到使用者，請先重新綁定'
-      currentTask.value = null
-      return
-    }
-
-    const q = query(
-      collection(db, 'users', userId, 'tasks'),
-      orderBy('startAt', 'asc'),
-      limit(20)
-    )
-
-    const snapshot = await getDocs(q)
-
-    if (snapshot.empty) {
-      currentTask.value = null
-      return
-    }
-
-    const taskList = snapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-    }))
-
-    const activeTasks = taskList
-      .filter((item) => item.status === 'pending' || item.status === 'doing')
-      .sort((a, b) => {
-        return getTime(a.startAt || a.scheduledAt) - getTime(b.startAt || b.scheduledAt)
-      })
-
-    currentTask.value = activeTasks[0] || null
-  } catch (error) {
-    console.error('loadCurrentTask error:', error)
-    errorMessage.value = '讀取當前任務失敗'
-    currentTask.value = null
-  } finally {
-    loadingTask.value = false
+  if (profileData?.pictureUrl) {
+    localStorage.setItem('pictureUrl', profileData.pictureUrl)
   }
 }
 
-async function completeTask(taskId) {
-  if (!taskId || !userId) return
+const clearLoginRedirectLock = () => {
+  sessionStorage.removeItem(LOGIN_LOCK_KEY)
+  sessionStorage.removeItem(LOGIN_LOCK_TIME_KEY)
+}
 
-  finishingTask.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+const setLoginRedirectLock = () => {
+  sessionStorage.setItem(LOGIN_LOCK_KEY, '1')
+  sessionStorage.setItem(LOGIN_LOCK_TIME_KEY, String(Date.now()))
+}
+
+const isLoginRedirectLocked = () => {
+  const locked = sessionStorage.getItem(LOGIN_LOCK_KEY)
+  const ts = Number(sessionStorage.getItem(LOGIN_LOCK_TIME_KEY) || '0')
+
+  if (!locked) return false
+
+  // 超過 15 秒就視為失效，避免永久卡住
+  if (!ts || Date.now() - ts > 15000) {
+    clearLoginRedirectLock()
+    return false
+  }
+
+  return true
+}
+
+const loadUserDoc = async (id) => {
+  const ref = doc(db, 'users', id)
+  const snap = await getDoc(ref)
+
+  if (!snap.exists()) return
+
+  const data = snap.data()
+  form.name = data.name || profile.value?.displayName || ''
+  form.nickname = data.nickname || ''
+  form.occupation = data.occupation || ''
+}
+
+const handleManualLogin = () => {
+  resetMessage()
+
+  if (!LIFF_ID) {
+    error.value = '缺少 LIFF ID，請設定 VITE_LIFF_ID'
+    return
+  }
+
+  setLoginRedirectLock()
+  liff.login()
+}
+
+const initLine = async () => {
+  resetMessage()
 
   try {
-    await updateDoc(doc(db, 'users', userId, 'tasks', taskId), {
-      status: 'done',
-      finishedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
+    if (!LIFF_ID) {
+      throw new Error('缺少 LIFF ID，請設定 VITE_LIFF_ID')
+    }
 
-    successMessage.value = '任務已完成'
-    await loadCurrentTask()
-  } catch (error) {
-    console.error('completeTask error:', error)
-    errorMessage.value = '完成任務失敗'
+    await liff.init({ liffId: LIFF_ID })
+
+    // 若登入成功，清掉跳轉鎖
+    if (liff.isLoggedIn()) {
+      clearLoginRedirectLock()
+    }
+
+    // 已有 local userId 時，避免整頁一直重抓造成體感卡死
+    const localUserId = localStorage.getItem(LOCAL_USER_KEY)
+
+    if (!liff.isLoggedIn()) {
+      if (!isLoginRedirectLocked()) {
+        setLoginRedirectLock()
+        liff.login()
+        return
+      }
+
+      error.value = 'LINE 登入尚未完成，請按「重新登入 LINE」'
+      return
+    }
+
+    const lineProfile = await liff.getProfile()
+    profile.value = lineProfile
+    userId.value = lineProfile.userId || ''
+
+    if (!userId.value) {
+      throw new Error('無法取得 LINE userId')
+    }
+
+    saveLocalUser(userId.value, lineProfile)
+
+    if (!form.name) {
+      form.name = lineProfile.displayName || ''
+    }
+
+    // 如果 localStorage 的 userId 跟當前一樣，仍然讀資料，但不做額外跳轉
+    if (!localUserId || localUserId === userId.value) {
+      await loadUserDoc(userId.value)
+    } else {
+      await loadUserDoc(userId.value)
+    }
+  } catch (err) {
+    console.error(err)
+    clearLoginRedirectLock()
+    error.value = err?.message || 'LINE 綁定失敗，請重新開啟頁面'
   } finally {
-    finishingTask.value = false
+    loading.value = false
+  }
+}
+
+const handleSave = async () => {
+  resetMessage()
+
+  if (!userId.value) {
+    error.value = '尚未取得 userId'
+    return
+  }
+
+  if (!form.name) {
+    error.value = '請填寫顯示名稱'
+    return
+  }
+
+  saving.value = true
+
+  try {
+    const ref = doc(db, 'users', userId.value)
+
+    await setDoc(
+      ref,
+      {
+        userId: userId.value,
+        lineUserId: userId.value,
+        name: form.name,
+        nickname: form.nickname,
+        occupation: form.occupation,
+        pictureUrl: profile.value?.pictureUrl || '',
+        displayName: profile.value?.displayName || form.name,
+        status: 'active',
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      },
+      { merge: true }
+    )
+
+    localStorage.setItem('name', form.name)
+    localStorage.setItem('nickname', form.nickname)
+    localStorage.setItem('occupation', form.occupation)
+
+    success.value = '綁定成功，正在進入首頁'
+
+    setTimeout(() => {
+      router.push('/home')
+    }, 500)
+  } catch (err) {
+    console.error(err)
+    error.value = '儲存失敗，請檢查 Firebase 權限與設定'
+  } finally {
+    saving.value = false
   }
 }
 
 onMounted(() => {
-  loadCurrentTask()
+  initLine()
 })
 </script>
 
 <style scoped>
-.home-page {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 20px;
-  color: #1f2937;
-}
-
-.hero-card {
+.bind-page {
+  min-height: 100vh;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  background: linear-gradient(135deg, #111827, #1f2937);
-  color: #fff;
-  border-radius: 24px;
-  padding: 24px;
-  margin-bottom: 20px;
+  justify-content: center;
+  padding: 20px;
+  background: #f7f8fa;
+  box-sizing: border-box;
 }
 
-.hello-text {
-  margin: 0 0 8px;
-  font-size: 14px;
-  opacity: 0.85;
-}
-
-.hero-card h1 {
-  margin: 0 0 8px;
-  font-size: 34px;
-}
-
-.hero-desc {
-  margin: 0;
-  opacity: 0.9;
-}
-
-.current-task-card,
-.menu-section {
+.bind-card {
+  width: 100%;
+  max-width: 460px;
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 22px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  border-radius: 20px;
+  padding: 28px 22px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
 }
 
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.section-head h2 {
-  margin: 0;
-  font-size: 22px;
-}
-
-.task-box {
-  border-radius: 18px;
-  background: #f9fafb;
-  padding: 18px;
-}
-
-.empty-box {
-  text-align: center;
-  border: 1px dashed #d1d5db;
-}
-
-.task-main h3 {
+.bind-card h1 {
   margin: 0 0 8px;
   font-size: 28px;
+  font-weight: 800;
+  color: #111;
 }
 
-.task-note {
-  margin: 0 0 14px;
-  color: #4b5563;
-  line-height: 1.7;
+.desc {
+  margin: 0 0 20px;
+  color: #666;
+  font-size: 14px;
 }
 
-.task-meta {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+.status-box {
+  padding: 24px 0;
+  text-align: center;
 }
 
-.meta-item {
-  background: #fff;
-  border-radius: 14px;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
+.status-text {
+  font-size: 16px;
+  color: #444;
 }
 
-.meta-item span {
-  display: block;
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 6px;
+.alert {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
 }
 
-.task-actions {
+.alert.error {
+  background: #fff1f1;
+  color: #b42318;
+}
+
+.alert.success {
+  background: #eefbf3;
+  color: #067647;
+}
+
+.profile-box {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f6f7fb;
+  margin-bottom: 18px;
 }
 
-.menu-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #ddd;
+}
+
+.profile-info {
+  min-width: 0;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+}
+
+.user-id {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #666;
+  word-break: break-all;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
 }
 
-.menu-card {
-  text-align: left;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  border-radius: 18px;
-  padding: 18px;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.menu-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
-}
-
-.menu-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: #111827;
-}
-
-.menu-desc {
-  color: #6b7280;
-  line-height: 1.6;
+.form-group label {
   font-size: 14px;
+  font-weight: 700;
+  color: #333;
 }
 
-.ghost-btn,
-.small-btn,
-.primary-btn,
-.success-btn {
+.form-group input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d8d8d8;
+  border-radius: 12px;
+  font-size: 15px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.form-group input:focus {
+  border-color: #111;
+}
+
+.btn {
   border: none;
   border-radius: 12px;
-  padding: 11px 14px;
+  padding: 13px 16px;
+  font-size: 15px;
   cursor: pointer;
-  font-size: 14px;
 }
 
-.ghost-btn {
-  background: rgba(255, 255, 255, 0.14);
+.btn.primary {
+  background: #111;
   color: #fff;
 }
 
-.small-btn {
-  background: #e5e7eb;
-  color: #111827;
-}
-
-.primary-btn {
-  background: #111827;
-  color: #fff;
-}
-
-.success-btn {
-  background: #16a34a;
-  color: #fff;
-}
-
-.error-msg,
-.success-msg {
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  border-radius: 12px;
-}
-
-.error-msg {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.success-msg {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-@media (max-width: 900px) {
-  .menu-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .task-meta {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .hero-card {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .menu-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .task-main h3 {
-    font-size: 22px;
-  }
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
