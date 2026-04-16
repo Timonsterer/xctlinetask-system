@@ -153,9 +153,7 @@ function handleLogin() {
   }
 
   stage.value = '手動登入中'
-  liff.login({
-    redirectUri: `${window.location.origin}/bind`,
-  })
+  liff.login()
 }
 
 async function initLine() {
