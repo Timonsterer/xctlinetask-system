@@ -6,6 +6,7 @@
 
       <div v-if="loading" class="status-box">
         <div class="status-text">綁定中...</div>
+        <div class="debug-text">{{ debugMessage }}</div>
       </div>
 
       <div v-else>
@@ -25,7 +26,7 @@
           </div>
         </div>
 
-        <form class="form" @submit.prevent="handleSave">
+        <form v-if="userId" class="form" @submit.prevent="handleSave">
           <div class="form-group">
             <label for="name">顯示名稱</label>
             <input
@@ -60,6 +61,13 @@
             {{ saving ? '儲存中...' : '完成綁定' }}
           </button>
         </form>
+
+        <div v-else class="status-box">
+          <div class="status-text">尚未登入 LINE</div>
+          <button class="btn primary" @click="handleManualLogin">
+            手動登入 LINE
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -78,6 +86,7 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
+const debugMessage = ref('')
 const userId = ref('')
 const profile = ref(null)
 
@@ -123,21 +132,38 @@ const loadUserDoc = async (id) => {
   form.occupation = data.occupation || ''
 }
 
+const handleManualLogin = () => {
+  if (!LIFF_ID) {
+    error.value = '缺少 LIFF ID，請設定 VITE_LIFF_ID'
+    return
+  }
+
+  liff.login({
+    redirectUri: window.location.origin + '/bind',
+  })
+}
+
 const initLine = async () => {
   resetMessage()
+  loading.value = true
 
   try {
     if (!LIFF_ID) {
       throw new Error('缺少 LIFF ID，請設定 VITE_LIFF_ID')
     }
 
+    debugMessage.value = 'LIFF 初始化中...'
     await liff.init({ liffId: LIFF_ID })
 
+    debugMessage.value = `isInClient: ${liff.isInClient()} / isLoggedIn: ${liff.isLoggedIn()}`
+
     if (!liff.isLoggedIn()) {
-      liff.login()
+      loading.value = false
+      debugMessage.value = '尚未登入，等待手動登入'
       return
     }
 
+    debugMessage.value = '取得 LINE 個人資料中...'
     const lineProfile = await liff.getProfile()
     profile.value = lineProfile
     userId.value = lineProfile.userId || ''
@@ -153,6 +179,7 @@ const initLine = async () => {
     }
 
     await loadUserDoc(userId.value)
+    debugMessage.value = 'LINE 綁定初始化完成'
   } catch (err) {
     console.error(err)
     error.value = err?.message || 'LINE 綁定失敗，請重新開啟頁面'
@@ -259,6 +286,13 @@ onMounted(() => {
 .status-text {
   font-size: 16px;
   color: #444;
+}
+
+.debug-text {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #888;
+  word-break: break-all;
 }
 
 .alert {
