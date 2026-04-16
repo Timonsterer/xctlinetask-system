@@ -4,77 +4,81 @@
       <h1>LINE 綁定</h1>
       <p class="desc">先取得 LINE 身分，才能進入系統</p>
 
+      <div class="debug-panel">
+        <div><strong>目前狀態：</strong>{{ stage }}</div>
+        <div><strong>目前網址：</strong>{{ currentUrl }}</div>
+        <div><strong>LIFF_ID：</strong>{{ maskedLiffId }}</div>
+        <div><strong>isInClient：</strong>{{ isInClientText }}</div>
+        <div><strong>isLoggedIn：</strong>{{ isLoggedInText }}</div>
+      </div>
+
       <div v-if="loading" class="status-box">
         <div class="status-text">綁定中...</div>
-        <div class="debug-text">{{ debugMessage }}</div>
       </div>
 
-      <div v-else>
-        <div v-if="error" class="alert error">{{ error }}</div>
-        <div v-if="success" class="alert success">{{ success }}</div>
+      <div v-if="error" class="alert error">{{ error }}</div>
+      <div v-if="success" class="alert success">{{ success }}</div>
 
-        <div v-if="profile" class="profile-box">
-          <img
-            v-if="profile.pictureUrl"
-            :src="profile.pictureUrl"
-            alt="avatar"
-            class="avatar"
+      <div v-if="profile" class="profile-box">
+        <img
+          v-if="profile.pictureUrl"
+          :src="profile.pictureUrl"
+          alt="avatar"
+          class="avatar"
+        />
+        <div class="profile-info">
+          <div class="name">{{ profile.displayName || 'LINE 使用者' }}</div>
+          <div class="user-id">userId：{{ userId }}</div>
+        </div>
+      </div>
+
+      <div v-if="!loading && !userId" class="action-box">
+        <button class="btn primary" @click="handleManualLogin">
+          手動登入 LINE
+        </button>
+      </div>
+
+      <form v-if="!loading && userId" class="form" @submit.prevent="handleSave">
+        <div class="form-group">
+          <label for="name">顯示名稱</label>
+          <input
+            id="name"
+            v-model.trim="form.name"
+            type="text"
+            placeholder="請輸入顯示名稱"
           />
-          <div class="profile-info">
-            <div class="name">{{ profile.displayName || 'LINE 使用者' }}</div>
-            <div class="user-id">userId：{{ userId }}</div>
-          </div>
         </div>
 
-        <form v-if="userId" class="form" @submit.prevent="handleSave">
-          <div class="form-group">
-            <label for="name">顯示名稱</label>
-            <input
-              id="name"
-              v-model.trim="form.name"
-              type="text"
-              placeholder="請輸入顯示名稱"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="nickname">暱稱</label>
-            <input
-              id="nickname"
-              v-model.trim="form.nickname"
-              type="text"
-              placeholder="可不填"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="occupation">身分 / 職業</label>
-            <input
-              id="occupation"
-              v-model.trim="form.occupation"
-              type="text"
-              placeholder="例如：上班族 / 自由工作者 / 業務"
-            />
-          </div>
-
-          <button class="btn primary" type="submit" :disabled="saving || !userId">
-            {{ saving ? '儲存中...' : '完成綁定' }}
-          </button>
-        </form>
-
-        <div v-else class="status-box">
-          <div class="status-text">尚未登入 LINE</div>
-          <button class="btn primary" @click="handleManualLogin">
-            手動登入 LINE
-          </button>
+        <div class="form-group">
+          <label for="nickname">暱稱</label>
+          <input
+            id="nickname"
+            v-model.trim="form.nickname"
+            type="text"
+            placeholder="可不填"
+          />
         </div>
-      </div>
+
+        <div class="form-group">
+          <label for="occupation">身分 / 職業</label>
+          <input
+            id="occupation"
+            v-model.trim="form.occupation"
+            type="text"
+            placeholder="例如：上班族 / 自由工作者 / 業務"
+          />
+        </div>
+
+        <button class="btn primary" type="submit" :disabled="saving || !userId">
+          {{ saving ? '儲存中...' : '完成綁定' }}
+        </button>
+      </form>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import liff from '@line/liff'
 import { db } from '@/firebase'
@@ -86,9 +90,12 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
-const debugMessage = ref('')
+const stage = ref('尚未開始')
 const userId = ref('')
 const profile = ref(null)
+const currentUrl = ref(window.location.href)
+const isInClientText = ref('未知')
+const isLoggedInText = ref('未知')
 
 const form = reactive({
   name: '',
@@ -100,6 +107,21 @@ const LIFF_ID =
   import.meta.env.VITE_LIFF_ID ||
   import.meta.env.VITE_LINE_LIFF_ID ||
   ''
+
+const maskedLiffId = computed(() => {
+  if (!LIFF_ID) return '未設定'
+  if (LIFF_ID.length <= 6) return LIFF_ID
+  return `${LIFF_ID.slice(0, 4)}***${LIFF_ID.slice(-3)}`
+})
+
+function withTimeout(promise, ms = 8000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`LIFF 初始化逾時（${ms / 1000} 秒）`)), ms)
+    ),
+  ])
+}
 
 const resetMessage = () => {
   error.value = ''
@@ -133,14 +155,15 @@ const loadUserDoc = async (id) => {
 }
 
 const handleManualLogin = () => {
+  resetMessage()
+
   if (!LIFF_ID) {
     error.value = '缺少 LIFF ID，請設定 VITE_LIFF_ID'
     return
   }
 
-  liff.login({
-    redirectUri: window.location.origin + '/bind',
-  })
+  stage.value = '準備手動登入'
+  liff.login()
 }
 
 const initLine = async () => {
@@ -148,22 +171,31 @@ const initLine = async () => {
   loading.value = true
 
   try {
+    currentUrl.value = window.location.href
+    stage.value = '檢查 LIFF_ID'
+
     if (!LIFF_ID) {
       throw new Error('缺少 LIFF ID，請設定 VITE_LIFF_ID')
     }
 
-    debugMessage.value = 'LIFF 初始化中...'
-    await liff.init({ liffId: LIFF_ID })
+    stage.value = '呼叫 liff.init()'
+    await withTimeout(
+      liff.init({
+        liffId: LIFF_ID,
+      }),
+      8000
+    )
 
-    debugMessage.value = `isInClient: ${liff.isInClient()} / isLoggedIn: ${liff.isLoggedIn()}`
+    stage.value = 'liff.init() 完成，檢查環境'
+    isInClientText.value = String(liff.isInClient())
+    isLoggedInText.value = String(liff.isLoggedIn())
 
     if (!liff.isLoggedIn()) {
-      loading.value = false
-      debugMessage.value = '尚未登入，等待手動登入'
+      stage.value = '尚未登入，等待手動登入'
       return
     }
 
-    debugMessage.value = '取得 LINE 個人資料中...'
+    stage.value = '取得 LINE 個人資料'
     const lineProfile = await liff.getProfile()
     profile.value = lineProfile
     userId.value = lineProfile.userId || ''
@@ -178,11 +210,14 @@ const initLine = async () => {
       form.name = lineProfile.displayName || ''
     }
 
+    stage.value = '讀取 Firestore 使用者資料'
     await loadUserDoc(userId.value)
-    debugMessage.value = 'LINE 綁定初始化完成'
+
+    stage.value = '初始化完成'
   } catch (err) {
     console.error(err)
     error.value = err?.message || 'LINE 綁定失敗，請重新開啟頁面'
+    stage.value = '初始化失敗'
   } finally {
     loading.value = false
   }
@@ -257,7 +292,7 @@ onMounted(() => {
 
 .bind-card {
   width: 100%;
-  max-width: 460px;
+  max-width: 520px;
   background: #fff;
   border-radius: 20px;
   padding: 28px 22px;
@@ -278,6 +313,17 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.debug-panel {
+  margin-bottom: 18px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f6f7fb;
+  font-size: 12px;
+  color: #333;
+  word-break: break-all;
+  line-height: 1.7;
+}
+
 .status-box {
   padding: 24px 0;
   text-align: center;
@@ -286,13 +332,6 @@ onMounted(() => {
 .status-text {
   font-size: 16px;
   color: #444;
-}
-
-.debug-text {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #888;
-  word-break: break-all;
 }
 
 .alert {
@@ -345,6 +384,10 @@ onMounted(() => {
   font-size: 12px;
   color: #666;
   word-break: break-all;
+}
+
+.action-box {
+  margin-top: 12px;
 }
 
 .form {
