@@ -64,7 +64,7 @@
         <div v-else class="status-box">
           <div class="status-text">尚未取得 LINE 身分</div>
           <button class="btn primary" @click="handleManualLogin">
-            重新登入 LINE
+            登入 LINE
           </button>
         </div>
       </div>
@@ -99,10 +99,6 @@ const LIFF_ID =
   import.meta.env.VITE_LINE_LIFF_ID ||
   ''
 
-const LOGIN_LOCK_KEY = 'line_login_redirecting'
-const LOGIN_LOCK_TIME_KEY = 'line_login_redirecting_at'
-const LOCAL_USER_KEY = 'userId'
-
 const resetMessage = () => {
   error.value = ''
   success.value = ''
@@ -120,31 +116,6 @@ const saveLocalUser = (id, profileData = null) => {
   if (profileData?.pictureUrl) {
     localStorage.setItem('pictureUrl', profileData.pictureUrl)
   }
-}
-
-const clearLoginRedirectLock = () => {
-  sessionStorage.removeItem(LOGIN_LOCK_KEY)
-  sessionStorage.removeItem(LOGIN_LOCK_TIME_KEY)
-}
-
-const setLoginRedirectLock = () => {
-  sessionStorage.setItem(LOGIN_LOCK_KEY, '1')
-  sessionStorage.setItem(LOGIN_LOCK_TIME_KEY, String(Date.now()))
-}
-
-const isLoginRedirectLocked = () => {
-  const locked = sessionStorage.getItem(LOGIN_LOCK_KEY)
-  const ts = Number(sessionStorage.getItem(LOGIN_LOCK_TIME_KEY) || '0')
-
-  if (!locked) return false
-
-  // 超過 15 秒就視為失效，避免永久卡住
-  if (!ts || Date.now() - ts > 15000) {
-    clearLoginRedirectLock()
-    return false
-  }
-
-  return true
 }
 
 const loadUserDoc = async (id) => {
@@ -167,12 +138,12 @@ const handleManualLogin = () => {
     return
   }
 
-  setLoginRedirectLock()
   liff.login()
 }
 
 const initLine = async () => {
   resetMessage()
+  loading.value = true
 
   try {
     if (!LIFF_ID) {
@@ -181,22 +152,9 @@ const initLine = async () => {
 
     await liff.init({ liffId: LIFF_ID })
 
-    // 若登入成功，清掉跳轉鎖
-    if (liff.isLoggedIn()) {
-      clearLoginRedirectLock()
-    }
-
-    // 已有 local userId 時，避免整頁一直重抓造成體感卡死
-    const localUserId = localStorage.getItem(LOCAL_USER_KEY)
-
+    // 關鍵：不要在這裡自動 login，避免 loop
     if (!liff.isLoggedIn()) {
-      if (!isLoginRedirectLocked()) {
-        setLoginRedirectLock()
-        liff.login()
-        return
-      }
-
-      error.value = 'LINE 登入尚未完成，請按「重新登入 LINE」'
+      loading.value = false
       return
     }
 
@@ -214,15 +172,9 @@ const initLine = async () => {
       form.name = lineProfile.displayName || ''
     }
 
-    // 如果 localStorage 的 userId 跟當前一樣，仍然讀資料，但不做額外跳轉
-    if (!localUserId || localUserId === userId.value) {
-      await loadUserDoc(userId.value)
-    } else {
-      await loadUserDoc(userId.value)
-    }
+    await loadUserDoc(userId.value)
   } catch (err) {
     console.error(err)
-    clearLoginRedirectLock()
     error.value = err?.message || 'LINE 綁定失敗，請重新開啟頁面'
   } finally {
     loading.value = false
@@ -268,11 +220,7 @@ const handleSave = async () => {
     localStorage.setItem('nickname', form.nickname)
     localStorage.setItem('occupation', form.occupation)
 
-    success.value = '綁定成功，正在進入首頁'
-
-    setTimeout(() => {
-      router.push('/home')
-    }, 500)
+    success.value = '綁定成功'
   } catch (err) {
     console.error(err)
     error.value = '儲存失敗，請檢查 Firebase 權限與設定'
