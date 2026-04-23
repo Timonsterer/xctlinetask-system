@@ -58,7 +58,7 @@
       <div v-else class="task-list">
         <div
           v-for="task in filteredTasks"
-          :key="task.id"
+          :key="task.key"
           class="task-item"
         >
           <div class="task-main">
@@ -66,6 +66,7 @@
               <div class="task-title">
                 {{ task.title || '未命名任務' }}
               </div>
+
               <div
                 class="status-badge"
                 :class="task.status === 'done' ? 'done' : 'pending'"
@@ -77,7 +78,9 @@
             <div class="task-time">
               <span v-if="task.startText">開始：{{ task.startText }}</span>
               <span v-if="task.endText">結束：{{ task.endText }}</span>
+              <span v-if="task.dueText">排程：{{ task.dueText }}</span>
               <span v-if="task.completedText">完成：{{ task.completedText }}</span>
+              <span v-if="task.durationLabel">時長：{{ task.durationLabel }}</span>
             </div>
 
             <div v-if="task.note" class="task-note">
@@ -87,7 +90,7 @@
 
           <div class="task-actions">
             <button
-              v-if="task.status !== 'done'"
+              v-if="task.status !== 'done' && task.source === 'tasks'"
               class="btn primary"
               type="button"
               @click="editTask(task.id)"
@@ -96,7 +99,7 @@
             </button>
 
             <button
-              v-if="task.status !== 'done'"
+              v-if="task.status !== 'done' && task.source === 'tasks'"
               class="btn success"
               type="button"
               @click="completeTask(task)"
@@ -106,12 +109,23 @@
             </button>
 
             <button
+              v-if="task.source === 'tasks'"
               class="btn danger"
               type="button"
               @click="deleteTask(task)"
               :disabled="actingId === task.id"
             >
               {{ actingId === task.id ? '處理中...' : '刪除' }}
+            </button>
+
+            <button
+              v-if="task.source === 'task_history'"
+              class="btn danger"
+              type="button"
+              @click="deleteHistory(task)"
+              :disabled="actingId === task.id"
+            >
+              {{ actingId === task.id ? '處理中...' : '刪除紀錄' }}
             </button>
           </div>
         </div>
@@ -174,7 +188,7 @@ const formatDateTime = (value) => {
     date = new Date(value)
   }
 
-  if (Number.isNaN(date.getTime())) return ''
+  if (!date || Number.isNaN(date.getTime())) return ''
 
   const yyyy = date.getFullYear()
   const mm = String(date.getMonth() + 1).padStart(2, '0')
@@ -183,6 +197,59 @@ const formatDateTime = (value) => {
   const mi = String(date.getMinutes()).padStart(2, '0')
 
   return `${yyyy}/${mm}/${dd} ${hh}:${mi}`
+}
+
+const getDurationLabel = (task) => {
+  if (task.durationText) return task.durationText
+  if (task.rawDurationInput) return task.rawDurationInput
+
+  const mins = Number(task.durationMinutes || 0)
+  if (!mins) return ''
+
+  const hh = String(Math.floor(mins / 60)).padStart(2, '0')
+  const mm = String(mins % 60).padStart(2, '0')
+  return `${hh}${mm}`
+}
+
+const normalizeTask = (id, data, source = 'tasks') => {
+  const status =
+    data.status === 'completed' || data.status === 'done'
+      ? 'done'
+      : 'pending'
+
+  const dueValue = data.dueAt || data.startAt || data.startText || null
+
+  return {
+    id,
+    key: `${source}-${id}`,
+    source,
+    status,
+
+    userId: data.userId || '',
+    ownerId: data.ownerId || '',
+
+    taskId: data.taskId || '',
+    title: data.title || '',
+    note: data.note || '',
+    type: data.type || 'key',
+
+    isCurrent: !!data.isCurrent,
+
+    startAt: data.startAt || null,
+    endAt: data.endAt || null,
+    dueAt: data.dueAt || null,
+    completedAt: data.completedAt || null,
+
+    startText: formatDateTime(data.startAt || data.startText),
+    endText: formatDateTime(data.endAt || data.endText),
+    dueText: formatDateTime(dueValue),
+    completedText: formatDateTime(data.completedAt),
+
+    durationText: data.durationText || '',
+    rawDurationInput: data.rawDurationInput || '',
+    durationMinutes: data.durationMinutes || 0,
+    durationLabel: getDurationLabel(data),
+  }
 }
 
 const filteredTasks = computed(() => {
@@ -198,6 +265,17 @@ const filteredTasks = computed(() => {
   })
 })
 
+const runSafeQuery = async (builder) => {
+  try {
+    const q = builder()
+    const snap = await getDocs(q)
+    return snap.docs
+  } catch (err) {
+    console.warn('query failed:', err)
+    return []
+  }
+}
+
 const loadTasks = async () => {
   loading.value = true
   resetMessage()
@@ -210,24 +288,105 @@ const loadTasks = async () => {
       return
     }
 
-    const q = query(
-      collection(db, 'tasks'),
-      where('userId', '==', userId),
-      orderBy('updatedAt', 'desc')
+    const taskDocs = new Map()
+    const historyDocs = new Map()
+
+    // tasks - userId
+    ;(
+      await runSafeQuery(() =>
+        query(
+          collection(db, 'tasks'),
+          where('userId', '==', userId),
+          orderBy('updatedAt', 'desc')
+        )
+      )
+    ).forEach((item) => taskDocs.set(item.id, item))
+
+    // tasks - ownerId
+    ;(
+      await runSafeQuery(() =>
+        query(
+          collection(db, 'tasks'),
+          where('ownerId', '==', userId),
+          orderBy('updatedAt', 'desc')
+        )
+      )
+    ).forEach((item) => taskDocs.set(item.id, item))
+
+    // task_history - userId
+    ;(
+      await runSafeQuery(() =>
+        query(
+          collection(db, 'task_history'),
+          where('userId', '==', userId),
+          orderBy('completedAt', 'desc')
+        )
+      )
+    ).forEach((item) => historyDocs.set(item.id, item))
+
+    // task_history - ownerId
+    ;(
+      await runSafeQuery(() =>
+        query(
+          collection(db, 'task_history'),
+          where('ownerId', '==', userId),
+          orderBy('completedAt', 'desc')
+        )
+      )
+    ).forEach((item) => historyDocs.set(item.id, item))
+
+    const normalizedTasks = [...taskDocs.values()].map((item) =>
+      normalizeTask(item.id, item.data(), 'tasks')
     )
 
-    const snap = await getDocs(q)
+    const normalizedHistory = [...historyDocs.values()].map((item) =>
+      normalizeTask(item.id, item.data(), 'task_history')
+    )
 
-    tasks.value = snap.docs.map((item) => {
-      const data = item.data()
-      return {
-        id: item.id,
-        ...data,
-        startText: formatDateTime(data.startAt || data.startText),
-        endText: formatDateTime(data.endAt || data.endText),
-        completedText: formatDateTime(data.completedAt),
+    // 已完成任務以 task_history 為主，避免 tasks 與 task_history 重複顯示
+    const completedTaskIdsInHistory = new Set(
+      normalizedHistory.map((item) => item.taskId).filter(Boolean)
+    )
+
+    const pendingFromTasks = normalizedTasks.filter(
+      (item) => item.status !== 'done'
+    )
+
+    const doneFromTasksOnly = normalizedTasks.filter(
+      (item) => item.status === 'done' && !completedTaskIdsInHistory.has(item.id)
+    )
+
+    const merged = [
+      ...pendingFromTasks,
+      ...normalizedHistory,
+      ...doneFromTasksOnly,
+    ]
+
+    merged.sort((a, b) => {
+      const getTime = (item) => {
+        const source =
+          item.completedAt || item.dueAt || item.startAt || null
+
+        if (typeof source?.toDate === 'function') {
+          return source.toDate().getTime()
+        }
+
+        if (source instanceof Date) {
+          return source.getTime()
+        }
+
+        if (source) {
+          const date = new Date(source)
+          if (!Number.isNaN(date.getTime())) return date.getTime()
+        }
+
+        return 0
       }
+
+      return getTime(b) - getTime(a)
     })
+
+    tasks.value = merged
   } catch (err) {
     console.error(err)
     error.value = '讀取任務紀錄失敗，請檢查 Firestore 索引'
@@ -250,11 +409,17 @@ const completeTask = async (task) => {
 
     await addDoc(collection(db, 'task_history'), {
       userId: getUserId(),
+      ownerId: getUserId(),
       taskId: task.id,
       title: task.title || '',
       note: task.note || '',
+      type: task.type || 'key',
       startAt: task.startAt || null,
       endAt: task.endAt || null,
+      dueAt: task.dueAt || task.startAt || null,
+      durationText: task.durationText || '',
+      rawDurationInput: task.rawDurationInput || '',
+      durationMinutes: task.durationMinutes || 0,
       completedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     })
@@ -280,6 +445,22 @@ const deleteTask = async (task) => {
   } catch (err) {
     console.error(err)
     error.value = '刪除任務失敗'
+  } finally {
+    actingId.value = ''
+  }
+}
+
+const deleteHistory = async (task) => {
+  resetMessage()
+  actingId.value = task.id
+
+  try {
+    await deleteDoc(doc(db, 'task_history', task.id))
+    success.value = '任務紀錄已刪除'
+    await loadTasks()
+  } catch (err) {
+    console.error(err)
+    error.value = '刪除任務紀錄失敗'
   } finally {
     actingId.value = ''
   }

@@ -123,6 +123,7 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  Timestamp,
 } from 'firebase/firestore'
 
 const route = useRoute()
@@ -167,6 +168,7 @@ const formatDateTime = (value) => {
   if (!value) return ''
 
   let date = null
+
   if (typeof value?.toDate === 'function') {
     date = value.toDate()
   } else if (value instanceof Date) {
@@ -274,6 +276,15 @@ const resetMessage = () => {
   success.value = ''
 }
 
+const normalizeOwnerId = (data = {}) => {
+  return data.userId || data.ownerId || ''
+}
+
+const normalizeStatus = (data = {}) => {
+  if (data.status === 'completed') return 'done'
+  return data.status || 'pending'
+}
+
 const loadTask = async () => {
   loading.value = true
   resetMessage()
@@ -294,8 +305,8 @@ const loadTask = async () => {
       return
     }
 
-    const ref = doc(db, 'tasks', String(taskId.value))
-    const snap = await getDoc(ref)
+    const refDoc = doc(db, 'tasks', String(taskId.value))
+    const snap = await getDoc(refDoc)
 
     if (!snap.exists()) {
       error.value = '找不到這筆任務'
@@ -304,8 +315,9 @@ const loadTask = async () => {
     }
 
     const data = snap.data()
+    const ownerId = normalizeOwnerId(data)
 
-    if (data.userId !== userId) {
+    if (ownerId !== userId) {
       error.value = '這筆任務不屬於你'
       loading.value = false
       return
@@ -313,13 +325,15 @@ const loadTask = async () => {
 
     form.title = data.title || ''
     form.note = data.note || ''
-    form.duration = data.durationText || '0030'
-    form.pinAsCurrent = data.status !== 'done'
+    form.quickTime = data.quickTime || data.rawTimeInput || ''
+    form.duration = data.durationText || data.rawDurationInput || '0030'
+    form.pinAsCurrent = data.isCurrent !== false && normalizeStatus(data) !== 'done'
 
-    if (data.startAt?.toDate) {
-      form.startAt = toDatetimeLocal(data.startAt.toDate())
-    } else if (data.startText) {
-      const d = new Date(data.startText)
+    const startSource = data.startAt || data.dueAt || data.startText
+    if (startSource?.toDate) {
+      form.startAt = toDatetimeLocal(startSource.toDate())
+    } else if (startSource) {
+      const d = new Date(startSource)
       if (!Number.isNaN(d.getTime())) {
         form.startAt = toDatetimeLocal(d)
       }
@@ -332,19 +346,50 @@ const loadTask = async () => {
   }
 }
 
-const demoteOtherPendingTasks = async () => {
-  const userId = getUserId()
-
+const fetchPendingTaskDocs = async (fieldName, userId) => {
   const q = query(
     collection(db, 'tasks'),
-    where('userId', '==', userId),
-    where('status', '==', 'pending'),
-    orderBy('startAt', 'asc'),
-    limit(20)
+    where(fieldName, '==', userId),
+    where('status', 'in', ['pending', 'completed', 'done'])
   )
 
   const snap = await getDocs(q)
-  const jobs = snap.docs
+  return snap.docs
+}
+
+const demoteOtherPendingTasks = async () => {
+  const userId = getUserId()
+  const docMap = new Map()
+
+  try {
+    const q1 = query(
+      collection(db, 'tasks'),
+      where('userId', '==', userId),
+      where('status', '==', 'pending'),
+      orderBy('updatedAt', 'desc'),
+      limit(50)
+    )
+    const snap1 = await getDocs(q1)
+    snap1.docs.forEach((item) => docMap.set(item.id, item))
+  } catch (err) {
+    console.warn('query by userId failed:', err)
+  }
+
+  try {
+    const q2 = query(
+      collection(db, 'tasks'),
+      where('ownerId', '==', userId),
+      where('status', '==', 'pending'),
+      orderBy('updatedAt', 'desc'),
+      limit(50)
+    )
+    const snap2 = await getDocs(q2)
+    snap2.docs.forEach((item) => docMap.set(item.id, item))
+  } catch (err) {
+    console.warn('query by ownerId failed:', err)
+  }
+
+  const jobs = [...docMap.values()]
     .filter((item) => item.id !== String(taskId.value || ''))
     .map((item) =>
       updateDoc(doc(db, 'tasks', item.id), {
@@ -372,6 +417,7 @@ const handleSubmit = async () => {
 
   const startDate = getStartDate()
   const endDate = getEndDate()
+  const durationMinutes = parseDurationMinutes(form.duration)
 
   if (endDate.getTime() <= startDate.getTime()) {
     error.value = '結束時間必須晚於開始時間'
@@ -387,16 +433,28 @@ const handleSubmit = async () => {
 
     const payload = {
       userId,
+      ownerId: userId,
+
       title: form.title,
-      note: form.note,
+      note: form.note || '',
+      type: 'key',
+
       quickTime: form.quickTime || '',
+      rawTimeInput: form.quickTime || '',
       durationText: form.duration || '0030',
-      startAt: startDate,
-      endAt: endDate,
+      rawDurationInput: form.duration || '0030',
+      durationMinutes,
+
+      startAt: Timestamp.fromDate(startDate),
+      endAt: Timestamp.fromDate(endDate),
+      dueAt: Timestamp.fromDate(startDate),
+
       startText: startDate.toISOString(),
       endText: endDate.toISOString(),
+
       status: 'pending',
       isCurrent: !!form.pinAsCurrent,
+      completedAt: null,
       updatedAt: serverTimestamp(),
     }
 
@@ -430,11 +488,39 @@ const markDone = async () => {
   saving.value = true
 
   try {
-    await updateDoc(doc(db, 'tasks', String(taskId.value)), {
+    const refDoc = doc(db, 'tasks', String(taskId.value))
+    const snap = await getDoc(refDoc)
+
+    if (!snap.exists()) {
+      throw new Error('找不到任務')
+    }
+
+    const data = snap.data()
+    const ownerId = normalizeOwnerId(data) || getUserId()
+
+    await updateDoc(refDoc, {
       status: 'done',
       isCurrent: false,
       completedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+    })
+
+    await addDoc(collection(db, 'task_history'), {
+      userId: ownerId,
+      ownerId,
+      taskId: String(taskId.value),
+      title: data.title || form.title || '',
+      note: data.note || form.note || '',
+      type: data.type || 'key',
+      startAt: data.startAt || (form.startAt ? Timestamp.fromDate(new Date(form.startAt)) : null),
+      endAt: data.endAt || null,
+      dueAt: data.dueAt || data.startAt || (form.startAt ? Timestamp.fromDate(new Date(form.startAt)) : null),
+      durationText: data.durationText || form.duration || '0030',
+      durationMinutes: data.durationMinutes || parseDurationMinutes(form.duration),
+      rawTimeInput: data.rawTimeInput || form.quickTime || '',
+      rawDurationInput: data.rawDurationInput || form.duration || '0030',
+      completedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
     })
 
     success.value = '任務已完成'
@@ -444,7 +530,7 @@ const markDone = async () => {
     }, 400)
   } catch (err) {
     console.error(err)
-    error.value = '完成任務失敗'
+    error.value = err?.message || '完成任務失敗'
   } finally {
     saving.value = false
   }
@@ -519,7 +605,6 @@ onMounted(() => {
 .form-group label {
   font-size: 14px;
   font-weight: 700;
-  color: #333;
 }
 
 .form-group input,
@@ -530,67 +615,60 @@ onMounted(() => {
   padding: 12px 14px;
   font-size: 15px;
   box-sizing: border-box;
-  outline: none;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  border-color: #111;
 }
 
 .hint {
-  font-size: 12px;
+  font-size: 13px;
   color: #666;
 }
 
 .preview-box {
+  border: 1px dashed #d4d4d4;
   border-radius: 14px;
-  background: #f6f7fb;
   padding: 14px;
+  background: #fafafa;
 }
 
 .preview-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   margin-bottom: 8px;
-  color: #111;
 }
 
 .preview-line {
   font-size: 14px;
   color: #444;
-  line-height: 1.7;
+  line-height: 1.8;
 }
 
 .switch-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 600;
+  gap: 8px;
+  font-weight: 700;
 }
 
 .actions {
   display: flex;
+  gap: 12px;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 4px;
 }
 
 .alert {
-  margin-bottom: 14px;
-  padding: 12px 14px;
+  margin-bottom: 16px;
   border-radius: 12px;
+  padding: 12px 14px;
   font-size: 14px;
 }
 
 .alert.error {
-  background: #fff1f1;
-  color: #b42318;
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .alert.success {
-  background: #eefbf3;
-  color: #067647;
+  background: #ecfdf5;
+  color: #047857;
 }
 
 .btn {
@@ -599,22 +677,21 @@ onMounted(() => {
   padding: 12px 16px;
   font-size: 15px;
   cursor: pointer;
-  background: #ececec;
-  color: #222;
+  background: #f3f4f6;
 }
 
 .btn.primary {
-  background: #111;
+  background: #2563eb;
   color: #fff;
 }
 
 .btn.danger {
-  background: #ffe7e7;
-  color: #b42318;
+  background: #dc2626;
+  color: #fff;
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
@@ -631,8 +708,8 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .card {
-    padding: 16px;
+  .actions {
+    flex-direction: column;
   }
 }
 </style>
