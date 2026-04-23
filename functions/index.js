@@ -1,77 +1,51 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
-import TaskFormView from '@/views/TaskFormView.vue'
-import TaskHistoryView from '@/views/TaskHistoryView.vue'
-import IdleFormView from '@/views/IdleFormView.vue'
-import IdleMarketView from '@/views/IdleMarketView.vue'
-import ContactListView from '@/views/ContactListView.vue'
-import ContactFormView from '@/views/ContactFormView.vue'
-import ContactDetailView from '@/views/ContactDetailView.vue'
-import LifeTemplateListView from '@/views/LifeTemplateListView.vue'
-import LifeTemplateDetailView from '@/views/LifeTemplateDetailView.vue'
+const functions = require('firebase-functions')
+const admin = require('firebase-admin')
+const axios = require('axios')
 
-const routes = [
-  {
-    path: '/',
-    redirect: '/home',
-  },
-  {
-    path: '/home',
-    name: 'home',
-    component: HomeView,
-  },
-  {
-    path: '/task/new',
-    name: 'task-form',
-    component: TaskFormView,
-  },
-  {
-    path: '/task/history',
-    name: 'task-history',
-    component: TaskHistoryView,
-  },
-  {
-    path: '/idle/new',
-    name: 'idle-form',
-    component: IdleFormView,
-  },
-  {
-    path: '/idle/market',
-    name: 'idle-market',
-    component: IdleMarketView,
-  },
-  {
-    path: '/contacts',
-    name: 'contact-list',
-    component: ContactListView,
-  },
-  {
-    path: '/contacts/new',
-    name: 'contact-form',
-    component: ContactFormView,
-  },
-  {
-    path: '/contacts/:id',
-    name: 'contact-detail',
-    component: ContactDetailView,
-    props: true,
-  },
-  {
-    path: '/life-templates',
-    name: 'life-template-list',
-    component: LifeTemplateListView,
-  },
-  {
-    path: '/life-templates/:id',
-    name: 'life-template-detail',
-    component: LifeTemplateDetailView,
-    props: true,
-  },
-]
+admin.initializeApp()
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-})
+// ⚠️ 先用這個測試（之後再改成 secret）
+const LINE_TOKEN = "你的LINE_CHANNEL_ACCESS_TOKEN"
 
-export default router
+exports.onInviteCreated = functions
+  .region('asia-east1')
+  .firestore
+  .document('idle_invites/{id}')
+  .onCreate(async (snap, context) => {
+
+    const data = snap.data()
+
+    if (!data) return null
+    if (!data.toUserId) return null
+
+    try {
+      await axios.post(
+        'https://api.line.me/v2/bot/message/push',
+        {
+          to: data.toUserId,
+          messages: [
+            {
+              type: 'text',
+              text:
+                `你收到新的邀請\n` +
+                `邀請人：${data.fromUserName || '有人'}\n` +
+                `內容：${data.title || '未填寫'}`
+            }
+          ]
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${LINE_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      console.log('LINE 發送成功')
+
+    } catch (err) {
+      console.error('LINE 發送失敗', err.response?.data || err.message)
+    }
+
+    return null
+  })
