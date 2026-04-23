@@ -75,9 +75,9 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import liff from '@line/liff'
 import { db } from '@/firebase'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { initLiff, getLiffProfile, loginLiff } from '@/utils/liff'
 
 const router = useRouter()
 
@@ -93,11 +93,6 @@ const form = reactive({
   nickname: '',
   occupation: '',
 })
-
-const LIFF_ID =
-  import.meta.env.VITE_LIFF_ID ||
-  import.meta.env.VITE_LINE_LIFF_ID ||
-  ''
 
 const resetMessage = () => {
   error.value = ''
@@ -130,46 +125,36 @@ const loadUserDoc = async (id) => {
   form.occupation = data.occupation || ''
 }
 
-const handleManualLogin = () => {
-  resetMessage()
-
-  if (!LIFF_ID) {
-    error.value = '缺少 LIFF ID，請設定 VITE_LIFF_ID'
-    return
-  }
-
-  liff.login()
-}
-
 const initLine = async () => {
   resetMessage()
   loading.value = true
 
   try {
-    if (!LIFF_ID) {
-      throw new Error('缺少 LIFF ID，請設定 VITE_LIFF_ID')
-    }
+    await initLiff()
 
-    await liff.init({ liffId: LIFF_ID })
+    const profileData = await getLiffProfile()
 
-    // 關鍵：不要在這裡自動 login，避免 loop
-    if (!liff.isLoggedIn()) {
-      loading.value = false
+    if (!profileData) {
       return
     }
 
-    const lineProfile = await liff.getProfile()
-    profile.value = lineProfile
-    userId.value = lineProfile.userId || ''
+    profile.value = {
+      userId: profileData.lineUserId,
+      displayName: profileData.displayName,
+      pictureUrl: profileData.pictureUrl,
+      statusMessage: profileData.statusMessage,
+    }
+
+    userId.value = profileData.lineUserId || ''
 
     if (!userId.value) {
       throw new Error('無法取得 LINE userId')
     }
 
-    saveLocalUser(userId.value, lineProfile)
+    saveLocalUser(userId.value, profile.value)
 
     if (!form.name) {
-      form.name = lineProfile.displayName || ''
+      form.name = profileData.displayName || ''
     }
 
     await loadUserDoc(userId.value)
@@ -178,6 +163,17 @@ const initLine = async () => {
     error.value = err?.message || 'LINE 綁定失敗，請重新開啟頁面'
   } finally {
     loading.value = false
+  }
+}
+
+const handleManualLogin = () => {
+  resetMessage()
+
+  try {
+    loginLiff()
+  } catch (err) {
+    console.error(err)
+    error.value = 'LINE 登入失敗，請稍後再試'
   }
 }
 
@@ -220,7 +216,11 @@ const handleSave = async () => {
     localStorage.setItem('nickname', form.nickname)
     localStorage.setItem('occupation', form.occupation)
 
-    success.value = '綁定成功'
+    success.value = '綁定成功，正在進入首頁'
+
+    setTimeout(() => {
+      router.push('/home')
+    }, 500)
   } catch (err) {
     console.error(err)
     error.value = '儲存失敗，請檢查 Firebase 權限與設定'

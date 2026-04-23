@@ -13,19 +13,17 @@ export async function initLiff() {
   return liff
 }
 
-export async function ensureLiffLogin() {
+export async function ensureLiffReady() {
   await initLiff()
-
-  if (!liff.isLoggedIn()) {
-    liff.login()
-    return null
-  }
-
   return liff
 }
 
 export async function getLiffProfile() {
-  await ensureLiffLogin()
+  await initLiff()
+
+  if (!liff.isLoggedIn()) {
+    return null
+  }
 
   const profile = await liff.getProfile()
   const idToken = liff.getIDToken()
@@ -37,6 +35,14 @@ export async function getLiffProfile() {
     statusMessage: profile.statusMessage || '',
     idToken: idToken || '',
   }
+}
+
+export function loginLiff() {
+  liff.login()
+}
+
+export function isLiffLoggedIn() {
+  return liff.isLoggedIn()
 }
 
 export { liff }
