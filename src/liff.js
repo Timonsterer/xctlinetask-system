@@ -5,8 +5,14 @@ let liffReady = false
 export async function initLiff() {
   if (liffReady) return liff
 
+  const liffId = import.meta.env.VITE_LIFF_ID
+
+  if (!liffId) {
+    throw new Error('VITE_LIFF_ID 未設定，請檢查 .env')
+  }
+
   await liff.init({
-    liffId: import.meta.env.VITE_LIFF_ID,
+    liffId,
   })
 
   liffReady = true
@@ -29,6 +35,7 @@ export async function getLiffProfile() {
   const idToken = liff.getIDToken()
 
   return {
+    userId: profile.userId,
     lineUserId: profile.userId,
     displayName: profile.displayName,
     pictureUrl: profile.pictureUrl || '',
