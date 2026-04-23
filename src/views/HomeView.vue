@@ -97,6 +97,52 @@
           </div>
         </div>
 
+        <div class="notify-wrap">
+          <button
+            class="notify-card"
+            :class="{ active: idlePublishedActive }"
+            @click="goIdleForm"
+          >
+            <div class="notify-icon-wrap">
+              <span class="notify-icon">🔔</span>
+              <span v-if="idlePublishedActive" class="notify-dot"></span>
+            </div>
+
+            <div class="notify-text">
+              <div class="notify-title">我很閒已發布狀態</div>
+              <div class="notify-desc">
+                {{ idlePublishedActive ? '你目前正在我很閒市場上架中' : '目前尚未上架' }}
+              </div>
+            </div>
+          </button>
+
+          <button
+            class="notify-card"
+            :class="{ active: pendingInviteCount > 0 }"
+            @click="goIdleMarket"
+          >
+            <div class="notify-icon-wrap">
+              <span class="notify-icon">🔔</span>
+              <span v-if="pendingInviteCount > 0" class="notify-dot"></span>
+            </div>
+
+            <div class="notify-text">
+              <div class="notify-title">我很閒受邀狀態</div>
+              <div class="notify-desc">
+                {{
+                  pendingInviteCount > 0
+                    ? `你有 ${pendingInviteCount} 筆待處理邀請`
+                    : '目前沒有新的邀請'
+                }}
+              </div>
+            </div>
+
+            <span v-if="pendingInviteCount > 0" class="notify-count">
+              {{ pendingInviteCount }}
+            </span>
+          </button>
+        </div>
+
         <div class="profile-box compact">
           <img
             v-if="userData.pictureUrl"
@@ -122,7 +168,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   addDoc,
@@ -154,6 +200,9 @@ const userData = ref(null)
 const currentTask = ref(null)
 const nextTask = ref(null)
 const pendingTasks = ref([])
+
+const idlePublishedActive = ref(false)
+const pendingInviteCount = ref(0)
 
 function getUserId() {
   return (
@@ -243,7 +292,7 @@ function normalizeTask(id, data) {
   }
 }
 
-const hasNextTask = computedLike(() => !!nextTask.value)
+const hasNextTask = computed(() => !!nextTask.value)
 
 async function loadTasks() {
   const userId = getUserId()
@@ -322,6 +371,60 @@ async function loadTasks() {
   }
 }
 
+async function loadIdleNotifications() {
+  const userId = getUserId()
+
+  idlePublishedActive.value = false
+  pendingInviteCount.value = 0
+
+  if (!userId) return
+
+  try {
+    const idleUserSnap = await getDoc(doc(db, 'idle_users', userId)).catch(() => null)
+
+    if (idleUserSnap?.exists()) {
+      const data = idleUserSnap.data()
+      if (data?.isActive === true) {
+        idlePublishedActive.value = true
+      }
+    }
+
+    if (!idlePublishedActive.value) {
+      const postQ1 = query(
+        collection(db, 'idle_posts'),
+        where('ownerId', '==', userId),
+        where('isActive', '==', true)
+      )
+
+      const postQ2 = query(
+        collection(db, 'idle_posts'),
+        where('userId', '==', userId),
+        where('isActive', '==', true)
+      )
+
+      const [postSnap1, postSnap2] = await Promise.all([
+        getDocs(postQ1).catch(() => null),
+        getDocs(postQ2).catch(() => null),
+      ])
+
+      if ((postSnap1 && !postSnap1.empty) || (postSnap2 && !postSnap2.empty)) {
+        idlePublishedActive.value = true
+      }
+    }
+
+    const inviteQ = query(
+      collection(db, 'idle_invites'),
+      where('toUserId', '==', userId),
+      where('status', '==', 'pending')
+    )
+
+    const inviteSnap = await getDocs(inviteQ).catch(() => null)
+    pendingInviteCount.value = inviteSnap?.size || 0
+  } catch (err) {
+    console.error('loadIdleNotifications error:', err)
+  }
+}
+
 async function initPage() {
   loading.value = true
   error.value = ''
@@ -352,13 +455,22 @@ async function initPage() {
     localStorage.setItem('lineUserId', userId)
     localStorage.setItem('line_user_id', userId)
 
+    if (lineProfile.displayName) {
+      localStorage.setItem('displayName', lineProfile.displayName)
+      localStorage.setItem('userName', lineProfile.displayName)
+    }
+
+    if (lineProfile.pictureUrl) {
+      localStorage.setItem('pictureUrl', lineProfile.pictureUrl)
+    }
+
     const userRef = doc(db, 'users', userId)
     const userSnap = await getDoc(userRef)
 
     if (userSnap.exists()) {
       isBound.value = true
       userData.value = userSnap.data()
-      await loadTasks()
+      await Promise.all([loadTasks(), loadIdleNotifications()])
     } else {
       isBound.value = false
       nickname.value = lineProfile.displayName || ''
@@ -417,7 +529,7 @@ async function bindAccount() {
     isBound.value = true
     userData.value = latestSnap.data()
 
-    await loadTasks()
+    await Promise.all([loadTasks(), loadIdleNotifications()])
   } catch (err) {
     console.error('Bind account error:', err)
     error.value = err?.message || '綁定失敗，請稍後再試'
@@ -476,7 +588,7 @@ async function goNextTask() {
       updatedAt: serverTimestamp(),
     })
 
-    await loadTasks()
+    await Promise.all([loadTasks(), loadIdleNotifications()])
   } catch (err) {
     console.error('goNextTask error:', err)
     error.value = err?.message || '切換下一個任務失敗'
@@ -501,14 +613,6 @@ function goIdleMarket() {
   router.push({ name: 'idle-market' })
 }
 
-function computedLike(getter) {
-  return {
-    get value() {
-      return getter()
-    },
-  }
-}
-
 initPage()
 </script>
 
@@ -518,50 +622,110 @@ initPage()
   background: linear-gradient(180deg, #f5f7fb 0%, #eef4ff 100%);
   display: flex;
   justify-content: center;
-  align-items: flex-start;
   padding: 20px;
+  box-sizing: border-box;
 }
 
 .card {
   width: 100%;
-  max-width: 460px;
-  background: #fff;
+  max-width: 760px;
+  background: #ffffff;
   border-radius: 24px;
-  padding: 20px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
-  text-align: center;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+h1 {
+  margin: 0 0 12px;
+  color: #111827;
+}
+
+.error {
+  color: #dc2626;
+  margin-bottom: 16px;
+}
+
+.profile-box {
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-box.compact {
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+
+.profile-text p,
+.line-name {
+  margin: 4px 0;
+  color: #334155;
+}
+
+.avatar {
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: #e5e7eb;
+}
+
+.avatar.small {
+  width: 52px;
+  height: 52px;
+}
+
+.bind-box {
+  margin-top: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.label {
+  font-weight: 600;
+  color: #334155;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  font-size: 16px;
+  box-sizing: border-box;
 }
 
 .current-task-hero {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: #fff;
-  border-radius: 22px;
-  padding: 22px 18px;
-  margin-bottom: 20px;
-  text-align: left;
-  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.28);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 60%, #3b82f6 100%);
+  color: #ffffff;
+  border-radius: 24px;
+  padding: 22px;
+  margin-bottom: 18px;
 }
 
 .hero-top {
   display: flex;
   justify-content: space-between;
+  gap: 16px;
   align-items: flex-start;
-  gap: 12px;
 }
 
 .hero-label {
   font-size: 13px;
-  opacity: 0.9;
-  margin-bottom: 6px;
-  letter-spacing: 1px;
+  opacity: 0.88;
+  margin-bottom: 8px;
 }
 
 .hero-title {
-  font-size: 30px;
-  line-height: 1.2;
+  font-size: 28px;
+  line-height: 1.25;
   margin: 0;
-  color: #fff;
-  font-weight: 800;
+  color: #ffffff;
 }
 
 .hero-body {
@@ -569,176 +733,198 @@ initPage()
 }
 
 .hero-note {
-  font-size: 15px;
-  line-height: 1.6;
   margin: 0 0 12px;
-  opacity: 0.96;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .hero-meta {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 14px;
-  opacity: 0.95;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .hero-empty {
-  margin-top: 16px;
-  font-size: 15px;
-  opacity: 0.95;
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .next-preview {
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.24);
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .next-preview-label {
   font-size: 12px;
-  opacity: 0.85;
-  margin-bottom: 4px;
+  opacity: 0.84;
+  margin-bottom: 6px;
 }
 
 .next-preview-title {
-  font-size: 18px;
   font-weight: 700;
-  margin-bottom: 4px;
+  font-size: 17px;
 }
 
 .next-preview-time {
+  margin-top: 4px;
   font-size: 13px;
-  opacity: 0.9;
+  opacity: 0.88;
 }
 
-.next-task-btn {
-  flex-shrink: 0;
+.next-task-btn,
+.primary-btn,
+.secondary-btn {
   border: none;
-  background: #fff;
-  color: #1d4ed8;
   border-radius: 14px;
-  padding: 12px 14px;
+  padding: 12px 18px;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  transition: 0.2s ease;
 }
 
-.next-task-btn:disabled {
-  opacity: 0.7;
+.next-task-btn {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  backdrop-filter: blur(6px);
+}
+
+.next-task-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.next-task-btn:disabled,
+.primary-btn:disabled,
+.secondary-btn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-h1 {
-  font-size: 28px;
-  margin-bottom: 12px;
-  color: #222;
+.notify-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
-.profile-box {
-  margin: 20px 0;
-}
-
-.profile-box.compact {
+.notify-card {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  text-align: left;
-  background: #f8fafc;
-  border-radius: 16px;
-  padding: 14px;
-}
-
-.profile-text p {
-  margin: 4px 0;
-  font-size: 14px;
-}
-
-.avatar {
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  object-fit: cover;
-  margin-bottom: 12px;
-  border: 3px solid #e9eef7;
-}
-
-.avatar.small {
-  width: 56px;
-  height: 56px;
-  margin-bottom: 0;
-}
-
-.line-name {
-  color: #444;
-  font-size: 15px;
-}
-
-.bind-box {
-  margin-top: 20px;
-  text-align: left;
-}
-
-.label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: #444;
-}
-
-.input {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid #d8deea;
-  border-radius: 12px;
-  font-size: 16px;
-  margin-bottom: 14px;
-  box-sizing: border-box;
-}
-
-.primary-btn,
-.secondary-btn {
-  width: 100%;
-  padding: 13px 14px;
-  border: none;
-  border-radius: 14px;
-  font-size: 16px;
   cursor: pointer;
-  margin-top: 10px;
+  text-align: left;
+  position: relative;
+  transition: 0.2s ease;
+}
+
+.notify-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.notify-card.active {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.notify-icon-wrap {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notify-icon {
+  font-size: 20px;
+}
+
+.notify-dot {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #ef4444;
+  border: 2px solid #ffffff;
+}
+
+.notify-text {
+  min-width: 0;
+}
+
+.notify-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.notify-desc {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.notify-count {
+  margin-left: auto;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
 .primary-btn {
   background: #2563eb;
-  color: #fff;
+  color: #ffffff;
 }
 
-.primary-btn:disabled {
-  background: #9db8f5;
-  cursor: not-allowed;
+.primary-btn:hover:not(:disabled) {
+  background: #1d4ed8;
 }
 
 .secondary-btn {
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
-.action-list {
-  margin-top: 20px;
+.secondary-btn:hover:not(:disabled) {
+  background: #cbd5e1;
 }
 
-.error {
-  color: #d93025;
-  margin: 12px 0;
-  font-size: 14px;
-}
-
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .home-page {
-    padding: 12px;
+    padding: 14px;
   }
 
   .card {
-    padding: 16px;
+    padding: 18px;
     border-radius: 20px;
   }
 
@@ -747,11 +933,15 @@ h1 {
   }
 
   .hero-title {
-    font-size: 26px;
+    font-size: 24px;
   }
 
-  .next-task-btn {
-    width: 100%;
+  .notify-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .action-list {
+    grid-template-columns: 1fr;
   }
 }
 </style>
