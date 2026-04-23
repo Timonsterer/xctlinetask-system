@@ -75,7 +75,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/firebase'
-import { initLiff, getLiffProfile } from '@/liff'
+import { initLiff, getLiffProfile, loginLiff, isLiffLoggedIn } from '@/liff'
 
 const router = useRouter()
 
@@ -95,10 +95,28 @@ async function initPage() {
   try {
     await initLiff()
 
+    if (!isLiffLoggedIn()) {
+      loginLiff()
+      return
+    }
+
     const lineProfile = await getLiffProfile()
+
+    if (!lineProfile) {
+      throw new Error('LINE 使用者資料取得失敗')
+    }
+
     profile.value = lineProfile
 
-    const userId = lineProfile.userId
+    const userId = lineProfile.userId || lineProfile.lineUserId
+
+    console.log('LIFF profile =', lineProfile)
+    console.log('Firestore users doc id =', userId)
+
+    if (!userId) {
+      throw new Error('抓不到 LINE userId')
+    }
+
     const userRef = doc(db, 'users', userId)
     const userSnap = await getDoc(userRef)
 
@@ -118,7 +136,9 @@ async function initPage() {
 }
 
 async function bindAccount() {
-  if (!profile.value?.userId) {
+  const userId = profile.value?.userId || profile.value?.lineUserId
+
+  if (!userId) {
     error.value = '找不到 LINE 使用者資料'
     return
   }
@@ -132,10 +152,11 @@ async function bindAccount() {
   error.value = ''
 
   try {
-    const userRef = doc(db, 'users', profile.value.userId)
+    const userRef = doc(db, 'users', userId)
 
     const payload = {
-      lineUserId: profile.value.userId,
+      userId,
+      lineUserId: userId,
       displayName: profile.value.displayName || '',
       pictureUrl: profile.value.pictureUrl || '',
       nickname: nickname.value,
@@ -151,11 +172,10 @@ async function bindAccount() {
 
     await setDoc(userRef, payload, { merge: true })
 
+    const latestSnap = await getDoc(userRef)
+
     isBound.value = true
-    userData.value = {
-      ...payload,
-      createdAt: userSnap.exists() ? userSnap.data()?.createdAt || null : new Date(),
-    }
+    userData.value = latestSnap.data()
   } catch (err) {
     console.error('Bind account error:', err)
     error.value = err?.message || '綁定失敗，請稍後再試'
@@ -165,21 +185,20 @@ async function bindAccount() {
 }
 
 function goTaskForm() {
-  router.push('/task-form')
+  router.push({ name: 'task-form' })
 }
 
 function goTaskHistory() {
-  router.push('/task-history')
+  router.push({ name: 'task-history' })
 }
 
 function goIdleForm() {
-  router.push('/idle-form')
+  router.push({ name: 'idle-form' })
 }
 
 function goIdleMarket() {
-  router.push('/idle-market')
+  router.push({ name: 'idle-market' })
 }
-
 initPage()
 </script>
 
