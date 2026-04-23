@@ -1,893 +1,757 @@
 <template>
-  <div class="idle-market-page">
-    <header class="page-header">
-      <div>
-        <h1>我很閒市場</h1>
-        <p>看看誰有空，也處理別人對你的邀請。</p>
-      </div>
+  <div class="home-page">
+    <div class="card">
+      <template v-if="loading">
+        <h1>載入中...</h1>
+        <p>正在確認 LINE 登入狀態</p>
+      </template>
 
-      <div class="header-actions">
-        <button class="ghost-btn" @click="goHome">
-          回首頁
-        </button>
-        <button class="primary-btn" @click="goIdleForm">
-          我要發佈我很閒
-        </button>
-      </div>
-    </header>
+      <template v-else-if="error">
+        <h1>發生錯誤</h1>
+        <p class="error">{{ error }}</p>
+        <button class="primary-btn" @click="initPage">重新載入</button>
+      </template>
 
-    <section class="invite-panel">
-      <div class="section-head">
-        <h2>我收到的邀請</h2>
-        <button class="ghost-btn small" @click="loadReceivedInvites" :disabled="inviteLoading">
-          {{ inviteLoading ? '載入中...' : '重新整理' }}
-        </button>
-      </div>
+      <template v-else-if="!isBound">
+        <h1>歡迎使用</h1>
 
-      <p v-if="inviteErrorMessage" class="error-msg">{{ inviteErrorMessage }}</p>
-      <p v-if="inviteSuccessMessage" class="success-msg">{{ inviteSuccessMessage }}</p>
+        <div v-if="profile" class="profile-box">
+          <img
+            v-if="profile.pictureUrl"
+            :src="profile.pictureUrl"
+            alt="avatar"
+            class="avatar"
+          />
+          <p class="line-name">LINE 名稱：{{ profile.displayName }}</p>
+        </div>
 
-      <div v-if="inviteLoading" class="state-box">
-        載入邀請中...
-      </div>
+        <div class="bind-box">
+          <label class="label">請輸入你的暱稱</label>
+          <input
+            v-model.trim="nickname"
+            type="text"
+            class="input"
+            placeholder="例如：Tim"
+            maxlength="20"
+          />
 
-      <div v-else-if="receivedInvites.length === 0" class="state-box">
-        目前沒有待處理邀請
-      </div>
+          <button
+            class="primary-btn"
+            :disabled="binding || !nickname"
+            @click="bindAccount"
+          >
+            {{ binding ? '綁定中...' : '完成綁定' }}
+          </button>
+        </div>
+      </template>
 
-      <div v-else class="invite-list">
-        <article
-          v-for="invite in receivedInvites"
-          :key="invite.id"
-          class="invite-card"
-        >
-          <div class="invite-main">
-            <div class="invite-title-row">
-              <h3>{{ invite.title || '未命名邀請' }}</h3>
-              <span class="invite-badge pending">待處理</span>
+      <template v-else>
+        <div class="current-task-hero">
+          <div class="hero-top">
+            <div>
+              <div class="hero-label">現在任務</div>
+              <h1 class="hero-title">
+                {{ currentTask ? currentTask.title || '未命名任務' : '目前沒有任務' }}
+              </h1>
             </div>
 
-            <p class="invite-line">
-              邀請人：{{ invite.fromUserName || invite.fromUserId || '未知使用者' }}
-            </p>
-
-            <p v-if="invite.timeText" class="invite-line">
-              時間：{{ invite.timeText }}
-            </p>
-
-            <p v-if="invite.location" class="invite-line">
-              地點：{{ invite.location }}
-            </p>
-
-            <p v-if="invite.reward" class="invite-line">
-              酬勞 / 備註：{{ invite.reward }}
-            </p>
-
-            <p class="invite-line subtle">
-              建立時間：{{ formatDateTime(invite.createdAt) }}
-            </p>
-          </div>
-
-          <div class="invite-actions">
             <button
-              class="accept-btn"
-              @click="updateInviteStatus(invite, 'accepted')"
-              :disabled="actingInviteId === invite.id"
+              class="next-task-btn"
+              :disabled="switchingTask"
+              @click="goNextTask"
             >
-              {{ actingInviteId === invite.id ? '處理中...' : '接受' }}
-            </button>
-
-            <button
-              class="decline-btn"
-              @click="updateInviteStatus(invite, 'declined')"
-              :disabled="actingInviteId === invite.id"
-            >
-              {{ actingInviteId === invite.id ? '處理中...' : '拒絕' }}
+              {{
+                switchingTask
+                  ? '切換中...'
+                  : hasNextTask
+                    ? '下一個任務'
+                    : '新增任務'
+              }}
             </button>
           </div>
-        </article>
-      </div>
-    </section>
 
-    <section class="toolbar">
-      <input
-        v-model.trim="keyword"
-        type="text"
-        class="search-input"
-        placeholder="搜尋名字、地區、可幫忙內容"
-      />
-
-      <select v-model="filterType" class="filter-select">
-        <option value="all">全部類型</option>
-        <option value="help">幫忙</option>
-        <option value="hangout">出門</option>
-        <option value="service">接案</option>
-      </select>
-
-      <button class="refresh-btn" @click="loadPosts" :disabled="loading">
-        {{ loading ? '載入中...' : '重新整理' }}
-      </button>
-    </section>
-
-    <p v-if="errorMessage" class="error-msg">{{ errorMessage }}</p>
-    <p v-if="successMessage" class="success-msg">{{ successMessage }}</p>
-
-    <section v-if="loading" class="state-box">
-      載入中...
-    </section>
-
-    <section v-else-if="filteredPosts.length === 0" class="state-box">
-      目前還沒有人公開「我很閒」。
-    </section>
-
-    <section v-else class="card-list">
-      <article
-        v-for="post in filteredPosts"
-        :key="post.id"
-        class="idle-card"
-      >
-        <div class="card-head">
-          <div class="avatar">
-            <span>{{ getInitial(post.ownerName) }}</span>
-          </div>
-
-          <div class="card-title-wrap">
-            <h3>
-              {{ post.ownerName || '未命名使用者' }}
-              <span v-if="isMine(post)" class="mine-tag">（我）</span>
-            </h3>
-            <p class="meta-line">
-              <span class="type-badge">{{ typeLabel(post.type) }}</span>
-              <span v-if="post.location">・{{ post.location }}</span>
+          <div v-if="currentTask" class="hero-body">
+            <p v-if="currentTask.note" class="hero-note">
+              {{ currentTask.note }}
             </p>
+
+            <div class="hero-meta">
+              <span v-if="currentTask.startText">開始：{{ currentTask.startText }}</span>
+              <span v-if="currentTask.endText">結束：{{ currentTask.endText }}</span>
+              <span v-if="currentTask.durationLabel">時長：{{ currentTask.durationLabel }}</span>
+            </div>
+          </div>
+
+          <div v-else class="hero-empty">
+            你目前沒有待做任務，直接新增一筆即可。
+          </div>
+
+          <div v-if="nextTask" class="next-preview">
+            <div class="next-preview-label">接下來</div>
+            <div class="next-preview-title">
+              {{ nextTask.title || '未命名任務' }}
+            </div>
+            <div v-if="nextTask.startText" class="next-preview-time">
+              {{ nextTask.startText }}
+            </div>
           </div>
         </div>
 
-        <div class="card-body">
-          <p class="main-title">
-            {{ post.title || '目前有空，可被邀請' }}
-          </p>
-
-          <p v-if="post.description" class="note-text">
-            {{ post.description }}
-          </p>
-
-          <div v-if="post.tags?.length" class="tag-wrap">
-            <span
-              v-for="tag in post.tags"
-              :key="tag"
-              class="tag"
-            >
-              {{ tag }}
-            </span>
+        <div class="profile-box compact">
+          <img
+            v-if="userData.pictureUrl"
+            :src="userData.pictureUrl"
+            alt="avatar"
+            class="avatar small"
+          />
+          <div class="profile-text">
+            <p><strong>暱稱：</strong>{{ userData.nickname || userData.displayName }}</p>
+            <p><strong>LINE 名稱：</strong>{{ userData.displayName }}</p>
           </div>
-
-          <p v-if="post.reward" class="detail-text">
-            酬勞 / 費用：{{ post.reward }}
-          </p>
-
-          <p v-if="post.startAt" class="detail-text">
-            開始時間：{{ formatDateTime(post.startAt) }}
-          </p>
-
-          <p class="time-text">
-            更新時間：{{ formatDateTime(post.updatedAt || post.createdAt) }}
-          </p>
         </div>
 
-        <div class="card-actions">
-          <button v-if="!isMine(post)" @click="openInviteModal(post)">
-            邀請他
-          </button>
-
-          <button v-else class="self-btn" disabled>
-            這是你自己
-          </button>
+        <div class="action-list">
+          <button class="primary-btn" @click="goTaskForm">新增任務</button>
+          <button class="secondary-btn" @click="goTaskHistory">任務紀錄</button>
+          <button class="secondary-btn" @click="goIdleForm">我很閒</button>
+          <button class="secondary-btn" @click="goIdleMarket">閒置列表</button>
         </div>
-      </article>
-    </section>
-
-    <div
-      v-if="inviteTarget"
-      class="modal-overlay"
-      @click.self="closeInviteModal"
-    >
-      <div class="modal-card">
-        <h3>邀請 {{ inviteTarget.ownerName || '對方' }}</h3>
-
-        <label class="modal-field">
-          <span>活動名稱</span>
-          <input
-            v-model="inviteForm.title"
-            type="text"
-            placeholder="例如：一起喝咖啡 / 幫我搬東西"
-          />
-        </label>
-
-        <label class="modal-field">
-          <span>時間</span>
-          <input
-            v-model="inviteForm.timeText"
-            type="text"
-            placeholder="例如：今晚 8:00"
-          />
-        </label>
-
-        <label class="modal-field">
-          <span>地點</span>
-          <input
-            v-model="inviteForm.location"
-            type="text"
-            placeholder="例如：鳳山捷運站"
-          />
-        </label>
-
-        <label class="modal-field">
-          <span>酬勞 / 備註</span>
-          <input
-            v-model="inviteForm.reward"
-            type="text"
-            placeholder="例如：飲料一杯 / 500元"
-          />
-        </label>
-
-        <div class="modal-actions">
-          <button class="ghost-btn" @click="closeInviteModal">
-            取消
-          </button>
-          <button @click="submitInvite" :disabled="sendingInvite">
-            {{ sendingInvite ? '送出中...' : '送出邀請' }}
-          </button>
-        </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   addDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
-  orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
-import { getIdlePosts } from '@/services/idleService'
+import { initLiff, getLiffProfile, loginLiff, isLiffLoggedIn } from '@/liff'
 
 const router = useRouter()
 
-const loading = ref(false)
-const sendingInvite = ref(false)
-const inviteLoading = ref(false)
-const actingInviteId = ref('')
+const loading = ref(true)
+const binding = ref(false)
+const switchingTask = ref(false)
+const error = ref('')
 
-const keyword = ref('')
-const filterType = ref('all')
+const profile = ref(null)
+const isBound = ref(false)
+const nickname = ref('')
+const userData = ref(null)
 
-const errorMessage = ref('')
-const successMessage = ref('')
-const inviteErrorMessage = ref('')
-const inviteSuccessMessage = ref('')
+const currentTask = ref(null)
+const nextTask = ref(null)
+const pendingTasks = ref([])
 
-const idlePosts = ref([])
-const inviteTarget = ref(null)
-const receivedInvites = ref([])
-
-const inviteForm = ref({
-  title: '',
-  timeText: '',
-  location: '',
-  reward: '',
-})
-
-const currentUser = ref({
-  id:
+function getUserId() {
+  return (
     localStorage.getItem('userId') ||
     localStorage.getItem('lineUserId') ||
     localStorage.getItem('line_user_id') ||
-    '',
-  name:
-    localStorage.getItem('userName') ||
-    localStorage.getItem('displayName') ||
-    '',
-  pictureUrl: localStorage.getItem('pictureUrl') || '',
-})
-
-const filteredPosts = computed(() => {
-  const kw = keyword.value.toLowerCase()
-
-  return idlePosts.value.filter((post) => {
-    if (post.isActive === false) return false
-
-    const text = [
-      post.ownerName || '',
-      post.location || '',
-      post.title || '',
-      post.description || '',
-      ...(Array.isArray(post.tags) ? post.tags : []),
-    ]
-      .join(' ')
-      .toLowerCase()
-
-    const matchKeyword = !kw || text.includes(kw)
-    const matchType =
-      filterType.value === 'all' || post.type === filterType.value
-
-    return matchKeyword && matchType
-  })
-})
-
-function resetMessage() {
-  errorMessage.value = ''
-  successMessage.value = ''
-}
-
-function resetInviteMessage() {
-  inviteErrorMessage.value = ''
-  inviteSuccessMessage.value = ''
-}
-
-function typeLabel(type) {
-  if (type === 'help') return '幫忙'
-  if (type === 'hangout') return '出門'
-  if (type === 'service') return '接案'
-  return '其他'
-}
-
-function getInitial(name) {
-  return (name || '?').slice(0, 1)
-}
-
-function isMine(post) {
-  const ownerId = post.ownerId || post.userId || ''
-  return !!currentUser.value.id && ownerId === currentUser.value.id
+    ''
+  )
 }
 
 function formatDateTime(value) {
-  if (!value) return '剛剛'
+  if (!value) return ''
 
-  const date = value?.toDate ? value.toDate() : new Date(value)
-  if (Number.isNaN(date.getTime())) return '剛剛'
+  let date = null
 
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
+  if (typeof value?.toDate === 'function') {
+    date = value.toDate()
+  } else if (value instanceof Date) {
+    date = value
+  } else {
+    date = new Date(value)
+  }
+
+  if (!date || Number.isNaN(date.getTime())) return ''
+
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
   const hh = String(date.getHours()).padStart(2, '0')
-  const mm = String(date.getMinutes()).padStart(2, '0')
-  return `${y}-${m}-${d} ${hh}:${mm}`
+  const mi = String(date.getMinutes()).padStart(2, '0')
+
+  return `${yyyy}/${mm}/${dd} ${hh}:${mi}`
 }
 
-async function loadPosts() {
-  loading.value = true
-  resetMessage()
+function getDurationLabel(task) {
+  if (task.durationText) return task.durationText
+  if (task.rawDurationInput) return task.rawDurationInput
+
+  const mins = Number(task.durationMinutes || 0)
+  if (!mins) return ''
+
+  const hh = String(Math.floor(mins / 60)).padStart(2, '0')
+  const mm = String(mins % 60).padStart(2, '0')
+  return `${hh}${mm}`
+}
+
+function getComparableTime(task) {
+  const source =
+    task.startAt ||
+    task.dueAt ||
+    task.createdAt ||
+    task.updatedAt ||
+    null
+
+  if (!source) return Number.MAX_SAFE_INTEGER
+
+  if (typeof source?.toDate === 'function') {
+    return source.toDate().getTime()
+  }
+
+  const date = new Date(source)
+  if (Number.isNaN(date.getTime())) return Number.MAX_SAFE_INTEGER
+
+  return date.getTime()
+}
+
+function normalizeTask(id, data) {
+  return {
+    id,
+    title: data.title || '',
+    note: data.note || '',
+    status: data.status || 'pending',
+    isCurrent: !!data.isCurrent,
+    userId: data.userId || data.ownerId || '',
+    startAt: data.startAt || null,
+    endAt: data.endAt || null,
+    dueAt: data.dueAt || null,
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null,
+    completedAt: data.completedAt || null,
+    durationText: data.durationText || '',
+    rawDurationInput: data.rawDurationInput || '',
+    durationMinutes: data.durationMinutes || 0,
+    startText: formatDateTime(data.startAt || data.dueAt),
+    endText: formatDateTime(data.endAt),
+    durationLabel: getDurationLabel(data),
+  }
+}
+
+const hasNextTask = computedLike(() => !!nextTask.value)
+
+async function loadTasks() {
+  const userId = getUserId()
+
+  currentTask.value = null
+  nextTask.value = null
+  pendingTasks.value = []
+
+  if (!userId) return
 
   try {
-    const posts = await getIdlePosts()
-    idlePosts.value = posts
-  } catch (error) {
-    console.error('loadPosts error:', error)
-    errorMessage.value = '讀取我很閒市場失敗'
+    const q1 = query(
+      collection(db, 'tasks'),
+      where('userId', '==', userId),
+      where('status', '==', 'pending')
+    )
+
+    const q2 = query(
+      collection(db, 'tasks'),
+      where('ownerId', '==', userId),
+      where('status', '==', 'pending')
+    )
+
+    const [snap1, snap2] = await Promise.all([
+      getDocs(q1).catch(() => null),
+      getDocs(q2).catch(() => null),
+    ])
+
+    const map = new Map()
+
+    if (snap1) {
+      snap1.docs.forEach((item) => {
+        map.set(item.id, normalizeTask(item.id, item.data()))
+      })
+    }
+
+    if (snap2) {
+      snap2.docs.forEach((item) => {
+        map.set(item.id, normalizeTask(item.id, item.data()))
+      })
+    }
+
+    const list = [...map.values()].sort((a, b) => {
+      if (a.isCurrent && !b.isCurrent) return -1
+      if (!a.isCurrent && b.isCurrent) return 1
+      return getComparableTime(a) - getComparableTime(b)
+    })
+
+    pendingTasks.value = list
+
+    const pinned = list.find((item) => item.isCurrent)
+    if (pinned) {
+      currentTask.value = pinned
+      nextTask.value = list.find((item) => item.id !== pinned.id) || null
+      return
+    }
+
+    if (list.length > 0) {
+      currentTask.value = list[0]
+      nextTask.value = list[1] || null
+
+      await updateDoc(doc(db, 'tasks', list[0].id), {
+        isCurrent: true,
+        updatedAt: serverTimestamp(),
+      })
+
+      currentTask.value.isCurrent = true
+      return
+    }
+
+    currentTask.value = null
+    nextTask.value = null
+  } catch (err) {
+    console.error('loadTasks error:', err)
+    error.value = err?.message || '讀取任務失敗'
+  }
+}
+
+async function initPage() {
+  loading.value = true
+  error.value = ''
+
+  try {
+    await initLiff()
+
+    if (!isLiffLoggedIn()) {
+      loginLiff()
+      return
+    }
+
+    const lineProfile = await getLiffProfile()
+
+    if (!lineProfile) {
+      throw new Error('LINE 使用者資料取得失敗')
+    }
+
+    profile.value = lineProfile
+
+    const userId = lineProfile.userId || lineProfile.lineUserId
+
+    if (!userId) {
+      throw new Error('抓不到 LINE userId')
+    }
+
+    localStorage.setItem('userId', userId)
+    localStorage.setItem('lineUserId', userId)
+    localStorage.setItem('line_user_id', userId)
+
+    const userRef = doc(db, 'users', userId)
+    const userSnap = await getDoc(userRef)
+
+    if (userSnap.exists()) {
+      isBound.value = true
+      userData.value = userSnap.data()
+      await loadTasks()
+    } else {
+      isBound.value = false
+      nickname.value = lineProfile.displayName || ''
+    }
+  } catch (err) {
+    console.error('Home init error:', err)
+    error.value = err?.message || '初始化失敗，請稍後再試'
   } finally {
     loading.value = false
   }
 }
 
-async function loadReceivedInvites() {
-  inviteLoading.value = true
-  resetInviteMessage()
+async function bindAccount() {
+  const userId = profile.value?.userId || profile.value?.lineUserId
 
-  try {
-    if (!currentUser.value.id) {
-      inviteErrorMessage.value = '找不到使用者，請先完成登入'
-      receivedInvites.value = []
-      return
-    }
-
-    const q = query(
-      collection(db, 'idle_invites'),
-      where('toUserId', '==', currentUser.value.id),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc')
-    )
-
-    const snap = await getDocs(q)
-    receivedInvites.value = snap.docs.map((item) => ({
-      id: item.id,
-      ...item.data(),
-    }))
-  } catch (error) {
-    console.error('loadReceivedInvites error:', error)
-    inviteErrorMessage.value = '讀取受邀狀態失敗'
-  } finally {
-    inviteLoading.value = false
-  }
-}
-
-function openInviteModal(post) {
-  inviteTarget.value = post
-  inviteForm.value = {
-    title: '',
-    timeText: '',
-    location: '',
-    reward: '',
-  }
-}
-
-function closeInviteModal() {
-  inviteTarget.value = null
-}
-
-async function submitInvite() {
-  if (!inviteTarget.value) return
-
-  resetMessage()
-
-  if (!currentUser.value.id) {
-    errorMessage.value = '找不到使用者，請先完成登入'
+  if (!userId) {
+    error.value = '找不到 LINE 使用者資料'
     return
   }
 
-  if (!inviteForm.value.title.trim()) {
-    errorMessage.value = '請輸入活動名稱'
+  localStorage.setItem('userId', userId)
+  localStorage.setItem('lineUserId', userId)
+  localStorage.setItem('line_user_id', userId)
+
+  if (!nickname.value) {
+    error.value = '請先輸入暱稱'
     return
   }
 
-  sendingInvite.value = true
+  binding.value = true
+  error.value = ''
 
   try {
-    await addDoc(collection(db, 'idle_invites'), {
-      fromUserId: currentUser.value.id,
-      fromUserName: currentUser.value.name || '',
-      toUserId: inviteTarget.value.ownerId || inviteTarget.value.userId || '',
-      toUserName: inviteTarget.value.ownerName || '',
-      postId: inviteTarget.value.id,
+    const userRef = doc(db, 'users', userId)
 
-      title: inviteForm.value.title.trim(),
-      timeText: inviteForm.value.timeText.trim(),
-      location: inviteForm.value.location.trim(),
-      reward: inviteForm.value.reward.trim(),
-
-      status: 'pending',
-      createdAt: serverTimestamp(),
+    const payload = {
+      userId,
+      lineUserId: userId,
+      displayName: profile.value.displayName || '',
+      pictureUrl: profile.value.pictureUrl || '',
+      nickname: nickname.value,
+      statusMessage: profile.value.statusMessage || '',
       updatedAt: serverTimestamp(),
-    })
-
-    successMessage.value = '邀請已送出'
-    closeInviteModal()
-
-    if (
-      (inviteTarget.value.ownerId || inviteTarget.value.userId || '') === currentUser.value.id
-    ) {
-      await loadReceivedInvites()
     }
-  } catch (error) {
-    console.error('submitInvite error:', error)
-    errorMessage.value = '送出邀請失敗'
+
+    const userSnap = await getDoc(userRef)
+
+    if (!userSnap.exists()) {
+      payload.createdAt = serverTimestamp()
+    }
+
+    await setDoc(userRef, payload, { merge: true })
+
+    const latestSnap = await getDoc(userRef)
+
+    isBound.value = true
+    userData.value = latestSnap.data()
+
+    await loadTasks()
+  } catch (err) {
+    console.error('Bind account error:', err)
+    error.value = err?.message || '綁定失敗，請稍後再試'
   } finally {
-    sendingInvite.value = false
+    binding.value = false
   }
 }
 
-async function updateInviteStatus(invite, status) {
-  if (!invite?.id) return
+async function goNextTask() {
+  if (switchingTask.value) return
 
-  actingInviteId.value = invite.id
-  resetInviteMessage()
+  if (!currentTask.value && !nextTask.value) {
+    router.push({ name: 'task-form' })
+    return
+  }
+
+  if (!nextTask.value) {
+    router.push({ name: 'task-form' })
+    return
+  }
+
+  switchingTask.value = true
+  error.value = ''
 
   try {
-    await updateDoc(doc(db, 'idle_invites', invite.id), {
-      status,
+    const userId = getUserId()
+
+    if (currentTask.value?.id) {
+      await updateDoc(doc(db, 'tasks', currentTask.value.id), {
+        status: 'done',
+        isCurrent: false,
+        completedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      await addDoc(collection(db, 'task_history'), {
+        userId,
+        ownerId: userId,
+        taskId: currentTask.value.id,
+        title: currentTask.value.title || '',
+        note: currentTask.value.note || '',
+        type: 'key',
+        startAt: currentTask.value.startAt || null,
+        endAt: currentTask.value.endAt || null,
+        dueAt: currentTask.value.dueAt || currentTask.value.startAt || null,
+        durationText: currentTask.value.durationText || '',
+        durationMinutes: currentTask.value.durationMinutes || 0,
+        rawDurationInput: currentTask.value.rawDurationInput || '',
+        completedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      })
+    }
+
+    await updateDoc(doc(db, 'tasks', nextTask.value.id), {
+      isCurrent: true,
       updatedAt: serverTimestamp(),
     })
 
-    inviteSuccessMessage.value =
-      status === 'accepted' ? '已接受邀請' : '已拒絕邀請'
-
-    receivedInvites.value = receivedInvites.value.filter(
-      (item) => item.id !== invite.id
-    )
-  } catch (error) {
-    console.error('updateInviteStatus error:', error)
-    inviteErrorMessage.value = '更新邀請狀態失敗'
+    await loadTasks()
+  } catch (err) {
+    console.error('goNextTask error:', err)
+    error.value = err?.message || '切換下一個任務失敗'
   } finally {
-    actingInviteId.value = ''
+    switchingTask.value = false
   }
+}
+
+function goTaskForm() {
+  router.push({ name: 'task-form' })
+}
+
+function goTaskHistory() {
+  router.push({ name: 'task-history' })
 }
 
 function goIdleForm() {
   router.push({ name: 'idle-form' })
 }
 
-function goHome() {
-  router.push({ name: 'home' })
+function goIdleMarket() {
+  router.push({ name: 'idle-market' })
 }
 
-onMounted(async () => {
-  await Promise.all([loadPosts(), loadReceivedInvites()])
-})
+function computedLike(getter) {
+  return {
+    get value() {
+      return getter()
+    },
+  }
+}
+
+initPage()
 </script>
 
 <style scoped>
-.idle-market-page {
-  max-width: 980px;
-  margin: 0 auto;
+.home-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f5f7fb 0%, #eef4ff 100%);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
   padding: 20px;
-  color: #1f2937;
 }
 
-.page-header {
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.page-header h1 {
-  font-size: 28px;
-  margin: 0 0 8px;
-}
-
-.page-header p {
-  margin: 0;
-  color: #6b7280;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.invite-panel {
-  margin-bottom: 24px;
-  padding: 18px;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #fffaf0;
-}
-
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.section-head h2 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.invite-list {
-  display: grid;
-  gap: 12px;
-}
-
-.invite-card {
-  border: 1px solid #f3e8c8;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 16px;
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.invite-main {
-  flex: 1;
-}
-
-.invite-title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-
-.invite-title-row h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.invite-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.invite-badge.pending {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.invite-line {
-  margin: 6px 0;
-  color: #374151;
-  line-height: 1.5;
-}
-
-.invite-line.subtle {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.invite-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.accept-btn,
-.decline-btn,
-.refresh-btn,
-.primary-btn,
-.card-actions button,
-.modal-actions button {
-  border: none;
-  border-radius: 12px;
-  padding: 12px 14px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.accept-btn,
-.refresh-btn,
-.primary-btn,
-.card-actions button,
-.modal-actions button {
-  background: #111827;
-  color: #fff;
-}
-
-.decline-btn {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.ghost-btn {
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  padding: 12px 14px;
-  cursor: pointer;
-  background: #fff;
-  color: #111827;
-  font-size: 14px;
-}
-
-.ghost-btn.small {
-  padding: 8px 12px;
-  font-size: 13px;
-}
-
-.toolbar {
-  display: grid;
-  grid-template-columns: 1.5fr 180px 140px;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.search-input,
-.filter-select,
-.modal-field input {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.error-msg,
-.success-msg {
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  border-radius: 12px;
-}
-
-.error-msg {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.success-msg {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.state-box {
-  padding: 28px;
-  text-align: center;
-  background: #f9fafb;
-  border: 1px dashed #d1d5db;
-  border-radius: 16px;
-}
-
-.card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.idle-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  padding: 16px;
-}
-
-.card-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 999px;
-  background: #111827;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.card-title-wrap h3 {
-  margin: 0 0 6px;
-  font-size: 18px;
-}
-
-.meta-line {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.mine-tag {
-  font-size: 13px;
-  color: #2563eb;
-  font-weight: 700;
-}
-
-.type-badge {
-  display: inline-block;
-  background: #eef2ff;
-  color: #4338ca;
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
-.card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.main-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.note-text,
-.detail-text,
-.time-text {
-  margin: 0;
-  color: #4b5563;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.tag-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag {
-  font-size: 12px;
-  background: #f3f4f6;
-  color: #374151;
-  border-radius: 999px;
-  padding: 5px 10px;
-}
-
-.card-actions {
-  margin-top: 16px;
-}
-
-.card-actions button {
-  width: 100%;
-}
-
-.self-btn {
-  width: 100%;
-  border: none;
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: #e5e7eb;
-  color: #6b7280;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(17, 24, 39, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 20;
-}
-
-.modal-card {
+.card {
   width: 100%;
   max-width: 460px;
   background: #fff;
-  border-radius: 18px;
+  border-radius: 24px;
   padding: 20px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  text-align: center;
 }
 
-.modal-card h3 {
-  margin: 0 0 16px;
+.current-task-hero {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  border-radius: 22px;
+  padding: 22px 18px;
+  margin-bottom: 20px;
+  text-align: left;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.28);
 }
 
-.modal-field {
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hero-label {
+  font-size: 13px;
+  opacity: 0.9;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+
+.hero-title {
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 0;
+  color: #fff;
+  font-weight: 800;
+}
+
+.hero-body {
+  margin-top: 16px;
+}
+
+.hero-note {
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+  opacity: 0.96;
+}
+
+.hero-meta {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 6px;
+  font-size: 14px;
+  opacity: 0.95;
 }
 
-.modal-field span {
-  font-size: 13px;
-  color: #374151;
+.hero-empty {
+  margin-top: 16px;
+  font-size: 15px;
+  opacity: 0.95;
 }
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+.next-preview {
   margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.24);
 }
 
-@media (max-width: 720px) {
-  .idle-market-page {
+.next-preview-label {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.next-preview-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.next-preview-time {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.next-task-btn {
+  flex-shrink: 0;
+  border: none;
+  background: #fff;
+  color: #1d4ed8;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.next-task-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+h1 {
+  font-size: 28px;
+  margin-bottom: 12px;
+  color: #222;
+}
+
+.profile-box {
+  margin: 20px 0;
+}
+
+.profile-box.compact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.profile-text p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 12px;
+  border: 3px solid #e9eef7;
+}
+
+.avatar.small {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 0;
+}
+
+.line-name {
+  color: #444;
+  font-size: 15px;
+}
+
+.bind-box {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #444;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d8deea;
+  border-radius: 12px;
+  font-size: 16px;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
+
+.primary-btn,
+.secondary-btn {
+  width: 100%;
+  padding: 13px 14px;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.primary-btn {
+  background: #2563eb;
+  color: #fff;
+}
+
+.primary-btn:disabled {
+  background: #9db8f5;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  background: #eef2ff;
+  color: #1e3a8a;
+}
+
+.action-list {
+  margin-top: 20px;
+}
+
+.error {
+  color: #d93025;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+@media (max-width: 480px) {
+  .home-page {
+    padding: 12px;
+  }
+
+  .card {
     padding: 16px;
+    border-radius: 20px;
   }
 
-  .page-header,
-  .section-head,
-  .invite-card {
+  .hero-top {
     flex-direction: column;
   }
 
-  .toolbar {
-    grid-template-columns: 1fr;
+  .hero-title {
+    font-size: 26px;
   }
 
-  .modal-actions,
-  .invite-actions {
-    flex-direction: column;
+  .next-task-btn {
+    width: 100%;
   }
 }
 </style>
