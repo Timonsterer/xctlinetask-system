@@ -115,7 +115,12 @@ const router = createRouter({
   },
 })
 
-// 簡單登入判斷
+/**
+ * 🔥 修正重點：
+ * 1. 不再強制跳 /bind
+ * 2. 允許 /home 作為初始化入口
+ * 3. 避免 LIFF 初始化被打斷
+ */
 router.beforeEach((to, from, next) => {
   const isPublic = to.meta?.public === true
 
@@ -124,13 +129,21 @@ router.beforeEach((to, from, next) => {
     localStorage.getItem('lineUserId') ||
     localStorage.getItem('line_user_id')
 
+  // 公開頁直接放行
   if (isPublic) {
     next()
     return
   }
 
+  // 🔥 關鍵：允許首頁進行初始化
+  if (to.path === '/home') {
+    next()
+    return
+  }
+
+  // 🔥 沒登入 → 回首頁（不是 /bind）
   if (!userId) {
-    next('/bind')
+    next('/home')
     return
   }
 

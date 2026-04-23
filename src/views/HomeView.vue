@@ -16,73 +16,40 @@
           <img
             v-if="profile.pictureUrl"
             :src="profile.pictureUrl"
-            alt="avatar"
             class="avatar"
           />
-          <div class="profile-info">
-            <div class="name">{{ profile.displayName || 'LINE 使用者' }}</div>
-            <div class="user-id">userId：{{ userId }}</div>
+          <div>
+            <div>{{ profile.displayName }}</div>
+            <div>{{ userId }}</div>
           </div>
         </div>
 
-        <form v-if="userId" class="form" @submit.prevent="handleSave">
-          <div class="form-group">
-            <label for="name">顯示名稱</label>
-            <input
-              id="name"
-              v-model.trim="form.name"
-              type="text"
-              placeholder="請輸入顯示名稱"
-            />
-          </div>
+        <div v-if="!userId">
+          <button @click="handleManualLogin">登入 LINE</button>
+        </div>
 
-          <div class="form-group">
-            <label for="nickname">暱稱</label>
-            <input
-              id="nickname"
-              v-model.trim="form.nickname"
-              type="text"
-              placeholder="可不填"
-            />
-          </div>
+        <form v-else @submit.prevent="handleSave">
+          <input v-model="form.name" placeholder="名稱" />
+          <input v-model="form.nickname" placeholder="暱稱" />
+          <input v-model="form.occupation" placeholder="職業" />
 
-          <div class="form-group">
-            <label for="occupation">身分 / 職業</label>
-            <input
-              id="occupation"
-              v-model.trim="form.occupation"
-              type="text"
-              placeholder="例如：上班族 / 自由工作者 / 業務"
-            />
-          </div>
-
-          <button class="btn primary" type="submit" :disabled="saving || !userId">
-            {{ saving ? '儲存中...' : '完成綁定' }}
-          </button>
+          <button type="submit">儲存</button>
         </form>
-
-        <div v-else class="status-box">
-          <div class="status-text">尚未取得 LINE 身分</div>
-          <button class="btn primary" @click="handleManualLogin">
-            登入 LINE
-          </button>
-        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { db } from '@/firebase'
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { initLiff, getLiffProfile, loginLiff } from '@/utils/liff'
 
 const router = useRouter()
 
 const loading = ref(true)
-const saving = ref(false)
 const error = ref('')
 const success = ref('')
 const userId = ref('')
@@ -94,144 +61,61 @@ const form = reactive({
   occupation: '',
 })
 
-const resetMessage = () => {
-  error.value = ''
-  success.value = ''
-}
-
-const saveLocalUser = (id, profileData = null) => {
-  localStorage.setItem('userId', id)
-  localStorage.setItem('lineUserId', id)
-  localStorage.setItem('line_user_id', id)
-
-  if (profileData?.displayName) {
-    localStorage.setItem('displayName', profileData.displayName)
-  }
-
-  if (profileData?.pictureUrl) {
-    localStorage.setItem('pictureUrl', profileData.pictureUrl)
-  }
-}
-
 const loadUserDoc = async (id) => {
-  const ref = doc(db, 'users', id)
-  const snap = await getDoc(ref)
-
+  const snap = await getDoc(doc(db, 'users', id))
   if (!snap.exists()) return
 
   const data = snap.data()
-  form.name = data.name || profile.value?.displayName || ''
+  form.name = data.name || ''
   form.nickname = data.nickname || ''
   form.occupation = data.occupation || ''
 }
 
 const initLine = async () => {
-  resetMessage()
-  loading.value = true
-
   try {
     await initLiff()
 
     const profileData = await getLiffProfile()
 
     if (!profileData) {
+      loading.value = false   // ✅ 修正點
       return
     }
 
-    profile.value = {
-      userId: profileData.lineUserId,
-      displayName: profileData.displayName,
-      pictureUrl: profileData.pictureUrl,
-      statusMessage: profileData.statusMessage,
-    }
+    profile.value = profileData
+    userId.value = profileData.lineUserId
 
-    userId.value = profileData.lineUserId || ''
-
-    if (!userId.value) {
-      throw new Error('無法取得 LINE userId')
-    }
-
-    saveLocalUser(userId.value, profile.value)
-
-    if (!form.name) {
-      form.name = profileData.displayName || ''
-    }
+    localStorage.setItem('userId', userId.value)
 
     await loadUserDoc(userId.value)
+
   } catch (err) {
     console.error(err)
-    error.value = err?.message || 'LINE 綁定失敗，請重新開啟頁面'
+    error.value = '初始化失敗'
   } finally {
     loading.value = false
   }
 }
 
 const handleManualLogin = () => {
-  resetMessage()
-
-  try {
-    loginLiff()
-  } catch (err) {
-    console.error(err)
-    error.value = 'LINE 登入失敗，請稍後再試'
-  }
+  loginLiff()
 }
 
 const handleSave = async () => {
-  resetMessage()
+  if (!userId.value) return
 
-  if (!userId.value) {
-    error.value = '尚未取得 userId'
-    return
-  }
+  await setDoc(doc(db, 'users', userId.value), {
+    userId: userId.value,
+    name: form.name,
+    nickname: form.nickname,
+    occupation: form.occupation,
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
 
-  if (!form.name) {
-    error.value = '請填寫顯示名稱'
-    return
-  }
-
-  saving.value = true
-
-  try {
-    const ref = doc(db, 'users', userId.value)
-
-    await setDoc(
-      ref,
-      {
-        userId: userId.value,
-        lineUserId: userId.value,
-        name: form.name,
-        nickname: form.nickname,
-        occupation: form.occupation,
-        pictureUrl: profile.value?.pictureUrl || '',
-        displayName: profile.value?.displayName || form.name,
-        status: 'active',
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      },
-      { merge: true }
-    )
-
-    localStorage.setItem('name', form.name)
-    localStorage.setItem('nickname', form.nickname)
-    localStorage.setItem('occupation', form.occupation)
-
-    success.value = '綁定成功，正在進入首頁'
-
-    setTimeout(() => {
-      router.push('/home')
-    }, 500)
-  } catch (err) {
-    console.error(err)
-    error.value = '儲存失敗，請檢查 Firebase 權限與設定'
-  } finally {
-    saving.value = false
-  }
+  success.value = '儲存成功'
 }
 
-onMounted(() => {
-  initLine()
-})
+onMounted(initLine)
 </script>
 
 <style scoped>
