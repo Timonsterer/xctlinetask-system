@@ -393,18 +393,33 @@ async function loadReceivedInvites() {
     const q = query(
       collection(db, 'idle_invites'),
       where('toUserId', '==', currentUser.value.id),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'pending')
     )
 
     const snap = await getDocs(q)
-    receivedInvites.value = snap.docs.map((item) => ({
-      id: item.id,
-      ...item.data(),
-    }))
+
+    receivedInvites.value = snap.docs
+      .map((item) => ({
+        id: item.id,
+        ...item.data(),
+      }))
+      .sort((a, b) => {
+        const aTime =
+          typeof a.createdAt?.toDate === 'function'
+            ? a.createdAt.toDate().getTime()
+            : 0
+
+        const bTime =
+          typeof b.createdAt?.toDate === 'function'
+            ? b.createdAt.toDate().getTime()
+            : 0
+
+        return bTime - aTime
+      })
   } catch (error) {
     console.error('loadReceivedInvites error:', error)
-    inviteErrorMessage.value = '讀取受邀狀態失敗'
+    inviteErrorMessage.value =
+      error?.message || '讀取受邀狀態失敗'
   } finally {
     inviteLoading.value = false
   }
