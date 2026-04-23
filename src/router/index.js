@@ -1,28 +1,125 @@
+import { createRouter, createWebHistory } from 'vue-router'
+
+// 核心頁面
+import LoginView from '@/views/LoginView.vue'
+import BindView from '@/views/BindView.vue'
+import HomeView from '@/views/HomeView.vue'
+import TaskFormView from '@/views/TaskFormView.vue'
+import TaskHistoryView from '@/views/TaskHistoryView.vue'
+
+// 我很閒
+import IdleFormView from '@/views/IdleFormView.vue'
+import IdleMarketView from '@/views/IdleMarketView.vue'
+
+// 聯絡人
+import ContactListView from '@/views/ContactListView.vue'
+import ContactFormView from '@/views/ContactFormView.vue'
+import ContactDetailView from '@/views/ContactDetailView.vue'
+
+// 生活套版
+import LifeTemplateListView from '@/views/LifeTemplateListView.vue'
+import LifeTemplateDetailView from '@/views/LifeTemplateDetailView.vue'
+
+const routes = [
+  {
+    path: '/',
+    redirect: '/home',
+  },
+
+  {
+    path: '/login',
+    name: 'login',
+    component: LoginView,
+    meta: { public: true },
+  },
+
+  {
+    path: '/bind',
+    name: 'bind',
+    component: BindView,
+    meta: { public: true },
+  },
+
+  {
+    path: '/home',
+    name: 'home',
+    component: HomeView,
+    meta: { public: true },
+  },
+
+  {
+    path: '/task-form',
+    name: 'task-form',
+    component: TaskFormView,
+  },
+  {
+    path: '/task-history',
+    name: 'task-history',
+    component: TaskHistoryView,
+  },
+
+  {
+    path: '/idle-form',
+    name: 'idle-form',
+    component: IdleFormView,
+  },
+  {
+    path: '/idle-market',
+    name: 'idle-market',
+    component: IdleMarketView,
+  },
+
+  {
+    path: '/contacts',
+    name: 'contacts',
+    component: ContactListView,
+  },
+  {
+    path: '/contacts/new',
+    name: 'contact-new',
+    component: ContactFormView,
+  },
+  {
+    path: '/contacts/:id',
+    name: 'contact-detail',
+    component: ContactDetailView,
+    props: true,
+  },
+  {
+    path: '/contacts/:id/edit',
+    name: 'contact-edit',
+    component: ContactFormView,
+    props: true,
+  },
+
+  {
+    path: '/life-templates',
+    name: 'life-templates',
+    component: LifeTemplateListView,
+  },
+  {
+    path: '/life-templates/:id',
+    name: 'life-template-detail',
+    component: LifeTemplateDetailView,
+    props: true,
+  },
+
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/home',
+  },
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+  scrollBehavior() {
+    return { top: 0 }
+  },
+})
+
 router.beforeEach((to, from, next) => {
-  const isPublic = to.meta?.public === true
-
-  const userId =
-    localStorage.getItem('userId') ||
-    localStorage.getItem('lineUserId') ||
-    localStorage.getItem('line_user_id')
-
-  // 公開頁
-  if (isPublic) {
-    next()
-    return
-  }
-
-  // 🔥 關鍵：讓 /home 永遠可以進
-  if (to.path === '/home') {
-    next()
-    return
-  }
-
-  // 🔥 沒登入 → 回首頁（不要去 /bind）
-  if (!userId) {
-    next('/home')
-    return
-  }
-
   next()
 })
+
+export default router
