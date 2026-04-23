@@ -176,13 +176,11 @@
         </div>
 
         <div class="card-actions">
-          <button v-if="!isMine(post)" @click="openInviteModal(post)">
-            邀請他
+          <div class="card-actions">
+            <button @click="openInviteModal(post)">
+            {{ isMine(post) ? '邀請自己（測試）' : '邀請他' }}
           </button>
-
-          <button v-else class="self-btn" disabled>
-            這是你自己
-          </button>
+          </div>
         </div>
       </article>
     </section>
