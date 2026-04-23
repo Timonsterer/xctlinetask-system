@@ -3,7 +3,7 @@
     <header class="page-header">
       <div>
         <h1>我很閒市場</h1>
-        <p>看看現在誰有空，也可以快速發出邀請。</p>
+        <p>看看誰有空，也處理別人對你的邀請。</p>
       </div>
 
       <div class="header-actions">
@@ -15,6 +15,79 @@
         </button>
       </div>
     </header>
+
+    <section class="invite-panel">
+      <div class="section-head">
+        <h2>我收到的邀請</h2>
+        <button class="ghost-btn small" @click="loadReceivedInvites" :disabled="inviteLoading">
+          {{ inviteLoading ? '載入中...' : '重新整理' }}
+        </button>
+      </div>
+
+      <p v-if="inviteErrorMessage" class="error-msg">{{ inviteErrorMessage }}</p>
+      <p v-if="inviteSuccessMessage" class="success-msg">{{ inviteSuccessMessage }}</p>
+
+      <div v-if="inviteLoading" class="state-box">
+        載入邀請中...
+      </div>
+
+      <div v-else-if="receivedInvites.length === 0" class="state-box">
+        目前沒有待處理邀請
+      </div>
+
+      <div v-else class="invite-list">
+        <article
+          v-for="invite in receivedInvites"
+          :key="invite.id"
+          class="invite-card"
+        >
+          <div class="invite-main">
+            <div class="invite-title-row">
+              <h3>{{ invite.title || '未命名邀請' }}</h3>
+              <span class="invite-badge pending">待處理</span>
+            </div>
+
+            <p class="invite-line">
+              邀請人：{{ invite.fromUserName || invite.fromUserId || '未知使用者' }}
+            </p>
+
+            <p v-if="invite.timeText" class="invite-line">
+              時間：{{ invite.timeText }}
+            </p>
+
+            <p v-if="invite.location" class="invite-line">
+              地點：{{ invite.location }}
+            </p>
+
+            <p v-if="invite.reward" class="invite-line">
+              酬勞 / 備註：{{ invite.reward }}
+            </p>
+
+            <p class="invite-line subtle">
+              建立時間：{{ formatDateTime(invite.createdAt) }}
+            </p>
+          </div>
+
+          <div class="invite-actions">
+            <button
+              class="accept-btn"
+              @click="updateInviteStatus(invite, 'accepted')"
+              :disabled="actingInviteId === invite.id"
+            >
+              {{ actingInviteId === invite.id ? '處理中...' : '接受' }}
+            </button>
+
+            <button
+              class="decline-btn"
+              @click="updateInviteStatus(invite, 'declined')"
+              :disabled="actingInviteId === invite.id"
+            >
+              {{ actingInviteId === invite.id ? '處理中...' : '拒絕' }}
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
 
     <section class="toolbar">
       <input
@@ -59,7 +132,10 @@
           </div>
 
           <div class="card-title-wrap">
-            <h3>{{ post.ownerName || '未命名使用者' }}</h3>
+            <h3>
+              {{ post.ownerName || '未命名使用者' }}
+              <span v-if="isMine(post)" class="mine-tag">（我）</span>
+            </h3>
             <p class="meta-line">
               <span class="type-badge">{{ typeLabel(post.type) }}</span>
               <span v-if="post.location">・{{ post.location }}</span>
@@ -100,8 +176,12 @@
         </div>
 
         <div class="card-actions">
-          <button @click="openInviteModal(post)">
+          <button v-if="!isMine(post)" @click="openInviteModal(post)">
             邀請他
+          </button>
+
+          <button v-else class="self-btn" disabled>
+            這是你自己
           </button>
         </div>
       </article>
@@ -167,7 +247,17 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
 import { db } from '@/firebase'
 import { getIdlePosts } from '@/services/idleService'
 
@@ -175,15 +265,20 @@ const router = useRouter()
 
 const loading = ref(false)
 const sendingInvite = ref(false)
+const inviteLoading = ref(false)
+const actingInviteId = ref('')
 
 const keyword = ref('')
 const filterType = ref('all')
 
 const errorMessage = ref('')
 const successMessage = ref('')
+const inviteErrorMessage = ref('')
+const inviteSuccessMessage = ref('')
 
 const idlePosts = ref([])
 const inviteTarget = ref(null)
+const receivedInvites = ref([])
 
 const inviteForm = ref({
   title: '',
@@ -211,30 +306,6 @@ const filteredPosts = computed(() => {
   return idlePosts.value.filter((post) => {
     if (post.isActive === false) return false
 
-const filteredPosts = computed(() => {
-  const kw = keyword.value.toLowerCase()
-
-  return idlePosts.value.filter((post) => {
-    if (post.isActive === false) return false
-
-    const text = [
-      post.ownerName || '',
-      post.location || '',
-      post.title || '',
-      post.description || '',
-      ...(Array.isArray(post.tags) ? post.tags : []),
-    ]
-      .join(' ')
-      .toLowerCase()
-
-    const matchKeyword = !kw || text.includes(kw)
-    const matchType =
-      filterType.value === 'all' || post.type === filterType.value
-
-    return matchKeyword && matchType
-  })
-})
-
     const text = [
       post.ownerName || '',
       post.location || '',
@@ -258,6 +329,11 @@ function resetMessage() {
   successMessage.value = ''
 }
 
+function resetInviteMessage() {
+  inviteErrorMessage.value = ''
+  inviteSuccessMessage.value = ''
+}
+
 function typeLabel(type) {
   if (type === 'help') return '幫忙'
   if (type === 'hangout') return '出門'
@@ -267,6 +343,11 @@ function typeLabel(type) {
 
 function getInitial(name) {
   return (name || '?').slice(0, 1)
+}
+
+function isMine(post) {
+  const ownerId = post.ownerId || post.userId || ''
+  return !!currentUser.value.id && ownerId === currentUser.value.id
 }
 
 function formatDateTime(value) {
@@ -298,6 +379,37 @@ async function loadPosts() {
   }
 }
 
+async function loadReceivedInvites() {
+  inviteLoading.value = true
+  resetInviteMessage()
+
+  try {
+    if (!currentUser.value.id) {
+      inviteErrorMessage.value = '找不到使用者，請先完成登入'
+      receivedInvites.value = []
+      return
+    }
+
+    const q = query(
+      collection(db, 'idle_invites'),
+      where('toUserId', '==', currentUser.value.id),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    )
+
+    const snap = await getDocs(q)
+    receivedInvites.value = snap.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+    }))
+  } catch (error) {
+    console.error('loadReceivedInvites error:', error)
+    inviteErrorMessage.value = '讀取受邀狀態失敗'
+  } finally {
+    inviteLoading.value = false
+  }
+}
+
 function openInviteModal(post) {
   inviteTarget.value = post
   inviteForm.value = {
@@ -315,6 +427,8 @@ function closeInviteModal() {
 async function submitInvite() {
   if (!inviteTarget.value) return
 
+  resetMessage()
+
   if (!currentUser.value.id) {
     errorMessage.value = '找不到使用者，請先完成登入'
     return
@@ -326,7 +440,6 @@ async function submitInvite() {
   }
 
   sendingInvite.value = true
-  resetMessage()
 
   try {
     await addDoc(collection(db, 'idle_invites'), {
@@ -343,15 +456,48 @@ async function submitInvite() {
 
       status: 'pending',
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     })
 
     successMessage.value = '邀請已送出'
     closeInviteModal()
+
+    if (
+      (inviteTarget.value.ownerId || inviteTarget.value.userId || '') === currentUser.value.id
+    ) {
+      await loadReceivedInvites()
+    }
   } catch (error) {
     console.error('submitInvite error:', error)
     errorMessage.value = '送出邀請失敗'
   } finally {
     sendingInvite.value = false
+  }
+}
+
+async function updateInviteStatus(invite, status) {
+  if (!invite?.id) return
+
+  actingInviteId.value = invite.id
+  resetInviteMessage()
+
+  try {
+    await updateDoc(doc(db, 'idle_invites', invite.id), {
+      status,
+      updatedAt: serverTimestamp(),
+    })
+
+    inviteSuccessMessage.value =
+      status === 'accepted' ? '已接受邀請' : '已拒絕邀請'
+
+    receivedInvites.value = receivedInvites.value.filter(
+      (item) => item.id !== invite.id
+    )
+  } catch (error) {
+    console.error('updateInviteStatus error:', error)
+    inviteErrorMessage.value = '更新邀請狀態失敗'
+  } finally {
+    actingInviteId.value = ''
   }
 }
 
@@ -364,7 +510,7 @@ function goHome() {
 }
 
 onMounted(async () => {
-  await loadPosts()
+  await Promise.all([loadPosts(), loadReceivedInvites()])
 })
 </script>
 
@@ -400,6 +546,133 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
+.invite-panel {
+  margin-bottom: 24px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #fffaf0;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.invite-list {
+  display: grid;
+  gap: 12px;
+}
+
+.invite-card {
+  border: 1px solid #f3e8c8;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.invite-main {
+  flex: 1;
+}
+
+.invite-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.invite-title-row h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.invite-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.invite-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.invite-line {
+  margin: 6px 0;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.invite-line.subtle {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.invite-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.accept-btn,
+.decline-btn,
+.refresh-btn,
+.primary-btn,
+.card-actions button,
+.modal-actions button {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.accept-btn,
+.refresh-btn,
+.primary-btn,
+.card-actions button,
+.modal-actions button {
+  background: #111827;
+  color: #fff;
+}
+
+.decline-btn {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.ghost-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: #fff;
+  color: #111827;
+  font-size: 14px;
+}
+
+.ghost-btn.small {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
 .toolbar {
   display: grid;
   grid-template-columns: 1.5fr 180px 140px;
@@ -416,37 +689,6 @@ onMounted(async () => {
   border-radius: 12px;
   font-size: 14px;
   box-sizing: border-box;
-}
-
-.refresh-btn,
-.primary-btn,
-.card-actions button,
-.modal-actions button {
-  border: none;
-  border-radius: 12px;
-  padding: 12px 14px;
-  cursor: pointer;
-  background: #111827;
-  color: #fff;
-  font-size: 14px;
-}
-
-.ghost-btn {
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  padding: 12px 14px;
-  cursor: pointer;
-  background: #fff;
-  color: #111827;
-  font-size: 14px;
-}
-
-.refresh-btn:disabled,
-.primary-btn:disabled,
-.card-actions button:disabled,
-.modal-actions button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .error-msg,
@@ -508,12 +750,6 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .card-title-wrap h3 {
   margin: 0 0 6px;
   font-size: 18px;
@@ -523,6 +759,12 @@ onMounted(async () => {
   margin: 0;
   color: #6b7280;
   font-size: 14px;
+}
+
+.mine-tag {
+  font-size: 13px;
+  color: #2563eb;
+  font-weight: 700;
 }
 
 .type-badge {
@@ -577,6 +819,15 @@ onMounted(async () => {
   width: 100%;
 }
 
+.self-btn {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -624,7 +875,9 @@ onMounted(async () => {
     padding: 16px;
   }
 
-  .page-header {
+  .page-header,
+  .section-head,
+  .invite-card {
     flex-direction: column;
   }
 
@@ -632,7 +885,8 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 
-  .modal-actions {
+  .modal-actions,
+  .invite-actions {
     flex-direction: column;
   }
 }
