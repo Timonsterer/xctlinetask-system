@@ -140,7 +140,12 @@
               去看我很閒市場
             </button>
 
-            <button class="btn danger" type="button" @click="turnOffIdle" :disabled="saving">
+            <button
+              class="btn danger"
+              type="button"
+              @click="turnOffIdle"
+              :disabled="saving"
+            >
               關閉閒置狀態
             </button>
           </div>
@@ -154,7 +159,15 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { db } from '@/firebase'
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore'
 
 const router = useRouter()
 
@@ -176,6 +189,7 @@ const form = reactive({
   reward: '',
   note: '',
   isActive: true,
+  postId: '',
 })
 
 const getUserId = () => {
@@ -187,18 +201,6 @@ const getUserId = () => {
   )
 }
 
-const getDefaultStart = () => {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() + 30)
-  return toDatetimeLocal(now)
-}
-
-const getDefaultEnd = () => {
-  const now = new Date()
-  now.setHours(now.getHours() + 2)
-  return toDatetimeLocal(now)
-}
-
 const toDatetimeLocal = (date) => {
   const yyyy = date.getFullYear()
   const mm = String(date.getMonth() + 1).padStart(2, '0')
@@ -208,9 +210,37 @@ const toDatetimeLocal = (date) => {
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
 }
 
+const getDefaultStart = () => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() + 30, 0, 0)
+  return toDatetimeLocal(now)
+}
+
+const getDefaultEnd = () => {
+  const now = new Date()
+  now.setHours(now.getHours() + 2)
+  now.setSeconds(0, 0)
+  return toDatetimeLocal(now)
+}
+
 const resetMessage = () => {
   error.value = ''
   success.value = ''
+}
+
+const getTags = () => {
+  const tags = []
+  if (form.canHelp) tags.push('可幫忙')
+  if (form.canChat) tags.push('可聊天')
+  if (form.canWork) tags.push('可接案')
+  if (form.canMeet) tags.push('可見面')
+  return tags
+}
+
+const resolveType = () => {
+  if (form.canWork) return 'service'
+  if (form.canChat) return 'hangout'
+  return 'help'
 }
 
 const loadIdleData = async () => {
@@ -222,38 +252,73 @@ const loadIdleData = async () => {
 
     if (!userId) {
       error.value = '尚未取得 userId，請先完成綁定'
-      loading.value = false
       return
     }
 
     form.availableFrom = getDefaultStart()
     form.availableTo = getDefaultEnd()
 
-    const ref = doc(db, 'idle_users', userId)
-    const snap = await getDoc(ref)
+    const refDoc = doc(db, 'idle_users', userId)
+    const snap = await getDoc(refDoc)
 
-    if (snap.exists()) {
-      const data = snap.data()
+    if (!snap.exists()) return
 
-      form.displayName = data.displayName || ''
-      form.title = data.title || ''
-      form.availableFrom = data.availableFromText || form.availableFrom
-      form.availableTo = data.availableToText || form.availableTo
-      form.locationText = data.locationText || ''
-      form.canHelp = data.canHelp ?? true
-      form.canChat = data.canChat ?? false
-      form.canWork = data.canWork ?? false
-      form.canMeet = data.canMeet ?? true
-      form.reward = data.reward || ''
-      form.note = data.note || ''
-      form.isActive = data.isActive ?? true
-    }
+    const data = snap.data()
+
+    form.displayName = data.displayName || ''
+    form.title = data.title || ''
+    form.availableFrom = data.availableFromText || form.availableFrom
+    form.availableTo = data.availableToText || form.availableTo
+    form.locationText = data.locationText || ''
+    form.canHelp = data.canHelp ?? true
+    form.canChat = data.canChat ?? false
+    form.canWork = data.canWork ?? false
+    form.canMeet = data.canMeet ?? true
+    form.reward = data.reward || ''
+    form.note = data.note || ''
+    form.isActive = data.isActive ?? true
+    form.postId = data.postId || ''
   } catch (err) {
     console.error(err)
     error.value = '載入失敗，請稍後再試'
   } finally {
     loading.value = false
   }
+}
+
+const syncIdlePost = async (userId) => {
+  const payload = {
+    userId,
+    ownerId: userId,
+    ownerName: form.displayName || '',
+    title: form.title || '',
+    description: form.note || '',
+    type: resolveType(),
+    location: form.locationText || '',
+    reward: form.reward || '',
+    startAt: form.availableFrom ? new Date(form.availableFrom) : null,
+    endAt: form.availableTo ? new Date(form.availableTo) : null,
+    startAtText: form.availableFrom || '',
+    endAtText: form.availableTo || '',
+    contactText: form.displayName || '',
+    contactUrl: '',
+    tags: getTags(),
+    isActive: !!form.isActive,
+    updatedAt: serverTimestamp(),
+  }
+
+  if (form.postId) {
+    await setDoc(doc(db, 'idle_posts', form.postId), payload, { merge: true })
+    return form.postId
+  }
+
+  const postRef = await addDoc(collection(db, 'idle_posts'), {
+    ...payload,
+    createdAt: serverTimestamp(),
+  })
+
+  form.postId = postRef.id
+  return postRef.id
 }
 
 const handleSubmit = async () => {
@@ -288,26 +353,33 @@ const handleSubmit = async () => {
   saving.value = true
 
   try {
-    const ref = doc(db, 'idle_users', userId)
+    const postId = await syncIdlePost(userId)
 
     await setDoc(
-      ref,
+      doc(db, 'idle_users', userId),
       {
         userId,
+        ownerId: userId,
+        postId,
+
         displayName: form.displayName,
         title: form.title,
+
         availableFromText: form.availableFrom,
         availableToText: form.availableTo,
         availableFrom: new Date(form.availableFrom),
         availableTo: new Date(form.availableTo),
+
         locationText: form.locationText,
         canHelp: form.canHelp,
         canChat: form.canChat,
         canWork: form.canWork,
         canMeet: form.canMeet,
+
         reward: form.reward,
         note: form.note,
         isActive: form.isActive,
+
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       },
@@ -335,11 +407,17 @@ const turnOffIdle = async () => {
   saving.value = true
 
   try {
-    const ref = doc(db, 'idle_users', userId)
-    await updateDoc(ref, {
+    await updateDoc(doc(db, 'idle_users', userId), {
       isActive: false,
       updatedAt: serverTimestamp(),
     })
+
+    if (form.postId) {
+      await updateDoc(doc(db, 'idle_posts', form.postId), {
+        isActive: false,
+        updatedAt: serverTimestamp(),
+      })
+    }
 
     form.isActive = false
     success.value = '已關閉閒置狀態'
@@ -352,7 +430,7 @@ const turnOffIdle = async () => {
 }
 
 const goMarket = () => {
-  router.push('/idle/market')
+  router.push('/idle-market')
 }
 
 onMounted(() => {
@@ -522,8 +600,8 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .card {
-    padding: 16px;
+  .actions {
+    flex-direction: column;
   }
 }
 </style>

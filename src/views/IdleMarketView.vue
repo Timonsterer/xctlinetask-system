@@ -1,8 +1,19 @@
 <template>
   <div class="idle-market-page">
     <header class="page-header">
-      <h1>我很閒市場</h1>
-      <p>看看現在誰有空，也可以快速發出邀請。</p>
+      <div>
+        <h1>我很閒市場</h1>
+        <p>看看現在誰有空，也可以快速發出邀請。</p>
+      </div>
+
+      <div class="header-actions">
+        <button class="ghost-btn" @click="goHome">
+          回首頁
+        </button>
+        <button class="primary-btn" @click="goIdleForm">
+          我要發佈我很閒
+        </button>
+      </div>
     </header>
 
     <section class="toolbar">
@@ -15,57 +26,14 @@
 
       <select v-model="filterType" class="filter-select">
         <option value="all">全部類型</option>
-        <option value="chat">聊天</option>
         <option value="help">幫忙</option>
         <option value="hangout">出門</option>
-        <option value="work">接案</option>
+        <option value="service">接案</option>
       </select>
 
-      <button class="refresh-btn" @click="loadIdleUsers" :disabled="loading">
+      <button class="refresh-btn" @click="loadPosts" :disabled="loading">
         {{ loading ? '載入中...' : '重新整理' }}
       </button>
-    </section>
-
-    <section class="my-status-card">
-      <div class="my-status-top">
-        <div>
-          <h2>我的閒置狀態</h2>
-          <p class="status-text">
-            目前狀態：
-            <strong>{{ myIdleEnabled ? '已公開我很閒' : '未公開' }}</strong>
-          </p>
-        </div>
-        <button class="toggle-btn" @click="toggleMyIdleStatus" :disabled="savingMyStatus">
-          {{ savingMyStatus ? '儲存中...' : myIdleEnabled ? '關閉我很閒' : '開啟我很閒' }}
-        </button>
-      </div>
-
-      <div class="my-form-grid">
-        <label>
-          <span>可幫忙內容</span>
-          <input v-model="myForm.title" type="text" placeholder="例如：可聊天、可陪買東西、可接小任務" />
-        </label>
-
-        <label>
-          <span>地區</span>
-          <input v-model="myForm.area" type="text" placeholder="例如：高雄鳳山" />
-        </label>
-
-        <label>
-          <span>類型</span>
-          <select v-model="myForm.type">
-            <option value="chat">聊天</option>
-            <option value="help">幫忙</option>
-            <option value="hangout">出門</option>
-            <option value="work">接案</option>
-          </select>
-        </label>
-
-        <label>
-          <span>聯絡備註</span>
-          <input v-model="myForm.note" type="text" placeholder="例如：晚上比較有空" />
-        </label>
-      </div>
     </section>
 
     <p v-if="errorMessage" class="error-msg">{{ errorMessage }}</p>
@@ -75,69 +43,118 @@
       載入中...
     </section>
 
-    <section v-else-if="filteredUsers.length === 0" class="state-box">
+    <section v-else-if="filteredPosts.length === 0" class="state-box">
       目前還沒有人公開「我很閒」。
     </section>
 
     <section v-else class="card-list">
       <article
-        v-for="user in filteredUsers"
-        :key="user.id"
+        v-for="post in filteredPosts"
+        :key="post.id"
         class="idle-card"
       >
         <div class="card-head">
           <div class="avatar">
-            <img v-if="user.pictureUrl" :src="user.pictureUrl" alt="avatar" />
-            <span v-else>{{ getInitial(user.name) }}</span>
+            <span>{{ getInitial(post.ownerName) }}</span>
           </div>
 
           <div class="card-title-wrap">
-            <h3>{{ user.name || '未命名使用者' }}</h3>
+            <h3>{{ post.ownerName || '未命名使用者' }}</h3>
             <p class="meta-line">
-              <span class="type-badge">{{ typeLabel(user.type) }}</span>
-              <span v-if="user.area">・{{ user.area }}</span>
+              <span class="type-badge">{{ typeLabel(post.type) }}</span>
+              <span v-if="post.location">・{{ post.location }}</span>
             </p>
           </div>
         </div>
 
         <div class="card-body">
-          <p class="main-title">{{ user.title || '目前有空，可被邀請' }}</p>
-          <p v-if="user.note" class="note-text">{{ user.note }}</p>
-          <p class="time-text">更新時間：{{ formatDateTime(user.updatedAt) }}</p>
+          <p class="main-title">
+            {{ post.title || '目前有空，可被邀請' }}
+          </p>
+
+          <p v-if="post.description" class="note-text">
+            {{ post.description }}
+          </p>
+
+          <div v-if="post.tags?.length" class="tag-wrap">
+            <span
+              v-for="tag in post.tags"
+              :key="tag"
+              class="tag"
+            >
+              {{ tag }}
+            </span>
+          </div>
+
+          <p v-if="post.reward" class="detail-text">
+            酬勞 / 費用：{{ post.reward }}
+          </p>
+
+          <p v-if="post.startAt" class="detail-text">
+            開始時間：{{ formatDateTime(post.startAt) }}
+          </p>
+
+          <p class="time-text">
+            更新時間：{{ formatDateTime(post.updatedAt || post.createdAt) }}
+          </p>
         </div>
 
         <div class="card-actions">
-          <button @click="openInviteModal(user)">邀請他</button>
+          <button @click="openInviteModal(post)">
+            邀請他
+          </button>
         </div>
       </article>
     </section>
 
-    <div v-if="inviteTarget" class="modal-overlay" @click.self="closeInviteModal">
+    <div
+      v-if="inviteTarget"
+      class="modal-overlay"
+      @click.self="closeInviteModal"
+    >
       <div class="modal-card">
-        <h3>邀請 {{ inviteTarget.name || '對方' }}</h3>
+        <h3>邀請 {{ inviteTarget.ownerName || '對方' }}</h3>
 
         <label class="modal-field">
           <span>活動名稱</span>
-          <input v-model="inviteForm.title" type="text" placeholder="例如：一起喝咖啡 / 幫我搬東西" />
+          <input
+            v-model="inviteForm.title"
+            type="text"
+            placeholder="例如：一起喝咖啡 / 幫我搬東西"
+          />
         </label>
 
         <label class="modal-field">
           <span>時間</span>
-          <input v-model="inviteForm.timeText" type="text" placeholder="例如：今晚 8:00" />
+          <input
+            v-model="inviteForm.timeText"
+            type="text"
+            placeholder="例如：今晚 8:00"
+          />
         </label>
 
         <label class="modal-field">
           <span>地點</span>
-          <input v-model="inviteForm.location" type="text" placeholder="例如：鳳山捷運站" />
+          <input
+            v-model="inviteForm.location"
+            type="text"
+            placeholder="例如：鳳山捷運站"
+          />
         </label>
 
         <label class="modal-field">
           <span>酬勞 / 備註</span>
-          <input v-model="inviteForm.reward" type="text" placeholder="例如：飲料一杯 / 500元" />
+          <input
+            v-model="inviteForm.reward"
+            type="text"
+            placeholder="例如：飲料一杯 / 500元"
+          />
         </label>
 
         <div class="modal-actions">
-          <button class="ghost-btn" @click="closeInviteModal">取消</button>
+          <button class="ghost-btn" @click="closeInviteModal">
+            取消
+          </button>
           <button @click="submitInvite" :disabled="sendingInvite">
             {{ sendingInvite ? '送出中...' : '送出邀請' }}
           </button>
@@ -149,11 +166,14 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
-import { db } from '../firebase'
+import { useRouter } from 'vue-router'
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { db } from '@/firebase'
+import { getIdlePosts } from '@/services/idleService'
+
+const router = useRouter()
 
 const loading = ref(false)
-const savingMyStatus = ref(false)
 const sendingInvite = ref(false)
 
 const keyword = ref('')
@@ -162,54 +182,65 @@ const filterType = ref('all')
 const errorMessage = ref('')
 const successMessage = ref('')
 
-const idleUsers = ref([])
-const myIdleEnabled = ref(false)
-
+const idlePosts = ref([])
 const inviteTarget = ref(null)
-
-const myForm = ref({
-  title: '',
-  area: '',
-  type: 'chat',
-  note: ''
-})
 
 const inviteForm = ref({
   title: '',
   timeText: '',
   location: '',
-  reward: ''
+  reward: '',
 })
 
 const currentUser = ref({
-  id: localStorage.getItem('lineUserId') || localStorage.getItem('userId') || '',
-  name: localStorage.getItem('userName') || '',
-  pictureUrl: localStorage.getItem('pictureUrl') || ''
+  id:
+    localStorage.getItem('userId') ||
+    localStorage.getItem('lineUserId') ||
+    localStorage.getItem('line_user_id') ||
+    '',
+  name:
+    localStorage.getItem('userName') ||
+    localStorage.getItem('displayName') ||
+    '',
+  pictureUrl: localStorage.getItem('pictureUrl') || '',
 })
 
-const filteredUsers = computed(() => {
+const filteredPosts = computed(() => {
   const kw = keyword.value.toLowerCase()
 
-  return idleUsers.value.filter((user) => {
-    const matchKeyword =
-      !kw ||
-      (user.name || '').toLowerCase().includes(kw) ||
-      (user.area || '').toLowerCase().includes(kw) ||
-      (user.title || '').toLowerCase().includes(kw) ||
-      (user.note || '').toLowerCase().includes(kw)
+  return idlePosts.value.filter((post) => {
+    if (post.isActive === false) return false
 
+    const ownerId = post.ownerId || post.userId || ''
+    if (ownerId && ownerId === currentUser.value.id) return false
+
+    const text = [
+      post.ownerName || '',
+      post.location || '',
+      post.title || '',
+      post.description || '',
+      ...(Array.isArray(post.tags) ? post.tags : []),
+    ]
+      .join(' ')
+      .toLowerCase()
+
+    const matchKeyword = !kw || text.includes(kw)
     const matchType =
-      filterType.value === 'all' || user.type === filterType.value
+      filterType.value === 'all' || post.type === filterType.value
 
     return matchKeyword && matchType
   })
 })
 
+function resetMessage() {
+  errorMessage.value = ''
+  successMessage.value = ''
+}
+
 function typeLabel(type) {
-  if (type === 'chat') return '聊天'
   if (type === 'help') return '幫忙'
   if (type === 'hangout') return '出門'
-  if (type === 'work') return '接案'
+  if (type === 'service') return '接案'
   return '其他'
 }
 
@@ -219,6 +250,7 @@ function getInitial(name) {
 
 function formatDateTime(value) {
   if (!value) return '剛剛'
+
   const date = value?.toDate ? value.toDate() : new Date(value)
   if (Number.isNaN(date.getTime())) return '剛剛'
 
@@ -230,101 +262,28 @@ function formatDateTime(value) {
   return `${y}-${m}-${d} ${hh}:${mm}`
 }
 
-async function loadMyIdleStatus() {
-  if (!currentUser.value.id) return
-
-  try {
-    const refDoc = doc(db, 'idle_market', currentUser.value.id)
-    const snap = await getDoc(refDoc)
-
-    if (!snap.exists()) return
-
-    const data = snap.data()
-    myIdleEnabled.value = !!data.enabled
-    myForm.value = {
-      title: data.title || '',
-      area: data.area || '',
-      type: data.type || 'chat',
-      note: data.note || ''
-    }
-  } catch (error) {
-    console.error('loadMyIdleStatus error:', error)
-  }
-}
-
-async function loadIdleUsers() {
+async function loadPosts() {
   loading.value = true
-  errorMessage.value = ''
+  resetMessage()
 
   try {
-    const q = query(
-      collection(db, 'idle_market'),
-      where('enabled', '==', true),
-      orderBy('updatedAt', 'desc')
-    )
-    const snap = await getDocs(q)
-
-    idleUsers.value = snap.docs
-      .map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data()
-      }))
-      .filter((item) => item.id !== currentUser.value.id)
+    const posts = await getIdlePosts()
+    idlePosts.value = posts
   } catch (error) {
-    console.error('loadIdleUsers error:', error)
+    console.error('loadPosts error:', error)
     errorMessage.value = '讀取我很閒市場失敗'
   } finally {
     loading.value = false
   }
 }
 
-async function toggleMyIdleStatus() {
-  if (!currentUser.value.id) {
-    errorMessage.value = '找不到使用者，請先完成登入'
-    return
-  }
-
-  savingMyStatus.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
-
-  try {
-    const nextEnabled = !myIdleEnabled.value
-
-    await setDoc(
-      doc(db, 'idle_market', currentUser.value.id),
-      {
-        userId: currentUser.value.id,
-        name: currentUser.value.name || '未命名使用者',
-        pictureUrl: currentUser.value.pictureUrl || '',
-        enabled: nextEnabled,
-        title: myForm.value.title || '',
-        area: myForm.value.area || '',
-        type: myForm.value.type || 'chat',
-        note: myForm.value.note || '',
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    )
-
-    myIdleEnabled.value = nextEnabled
-    successMessage.value = nextEnabled ? '已開啟我很閒狀態' : '已關閉我很閒狀態'
-    await loadIdleUsers()
-  } catch (error) {
-    console.error('toggleMyIdleStatus error:', error)
-    errorMessage.value = '儲存失敗，請稍後再試'
-  } finally {
-    savingMyStatus.value = false
-  }
-}
-
-function openInviteModal(user) {
-  inviteTarget.value = user
+function openInviteModal(post) {
+  inviteTarget.value = post
   inviteForm.value = {
     title: '',
     timeText: '',
     location: '',
-    reward: ''
+    reward: '',
   }
 }
 
@@ -335,27 +294,34 @@ function closeInviteModal() {
 async function submitInvite() {
   if (!inviteTarget.value) return
 
+  if (!currentUser.value.id) {
+    errorMessage.value = '找不到使用者，請先完成登入'
+    return
+  }
+
   if (!inviteForm.value.title.trim()) {
     errorMessage.value = '請輸入活動名稱'
     return
   }
 
   sendingInvite.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessage()
 
   try {
     await addDoc(collection(db, 'idle_invites'), {
-      fromUserId: currentUser.value.id || '',
+      fromUserId: currentUser.value.id,
       fromUserName: currentUser.value.name || '',
-      toUserId: inviteTarget.value.id,
-      toUserName: inviteTarget.value.name || '',
+      toUserId: inviteTarget.value.ownerId || inviteTarget.value.userId || '',
+      toUserName: inviteTarget.value.ownerName || '',
+      postId: inviteTarget.value.id,
+
       title: inviteForm.value.title.trim(),
       timeText: inviteForm.value.timeText.trim(),
       location: inviteForm.value.location.trim(),
       reward: inviteForm.value.reward.trim(),
+
       status: 'pending',
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
     })
 
     successMessage.value = '邀請已送出'
@@ -368,9 +334,16 @@ async function submitInvite() {
   }
 }
 
+function goIdleForm() {
+  router.push({ name: 'idle-form' })
+}
+
+function goHome() {
+  router.push({ name: 'home' })
+}
+
 onMounted(async () => {
-  await loadMyIdleStatus()
-  await loadIdleUsers()
+  await loadPosts()
 })
 </script>
 
@@ -384,6 +357,10 @@ onMounted(async () => {
 
 .page-header {
   margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .page-header h1 {
@@ -396,6 +373,12 @@ onMounted(async () => {
   color: #6b7280;
 }
 
+.header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .toolbar {
   display: grid;
   grid-template-columns: 1.5fr 180px 140px;
@@ -405,8 +388,6 @@ onMounted(async () => {
 
 .search-input,
 .filter-select,
-.my-form-grid input,
-.my-form-grid select,
 .modal-field input {
   width: 100%;
   padding: 12px;
@@ -417,7 +398,7 @@ onMounted(async () => {
 }
 
 .refresh-btn,
-.toggle-btn,
+.primary-btn,
 .card-actions button,
 .modal-actions button {
   border: none;
@@ -429,57 +410,22 @@ onMounted(async () => {
   font-size: 14px;
 }
 
+.ghost-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: #fff;
+  color: #111827;
+  font-size: 14px;
+}
+
 .refresh-btn:disabled,
-.toggle-btn:disabled,
+.primary-btn:disabled,
 .card-actions button:disabled,
 .modal-actions button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.my-status-card {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  padding: 18px;
-  margin-bottom: 20px;
-}
-
-.my-status-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.my-status-top h2 {
-  margin: 0 0 6px;
-  font-size: 20px;
-}
-
-.status-text {
-  margin: 0;
-  color: #6b7280;
-}
-
-.my-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
-
-.my-form-grid label,
-.modal-field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.my-form-grid span,
-.modal-field span {
-  font-size: 13px;
-  color: #374151;
 }
 
 .error-msg,
@@ -518,26 +464,27 @@ onMounted(async () => {
   border: 1px solid #e5e7eb;
   border-radius: 18px;
   padding: 16px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
 }
 
 .card-head {
   display: flex;
-  gap: 12px;
   align-items: center;
+  gap: 12px;
   margin-bottom: 14px;
 }
 
 .avatar {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
-  overflow: hidden;
-  background: #e5e7eb;
+  background: #111827;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .avatar img {
@@ -554,37 +501,59 @@ onMounted(async () => {
 .meta-line {
   margin: 0;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .type-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
   background: #eef2ff;
   color: #4338ca;
+  border-radius: 999px;
+  padding: 4px 8px;
   font-size: 12px;
 }
 
 .card-body {
-  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .main-title {
-  margin: 0 0 8px;
+  margin: 0;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .note-text,
+.detail-text,
 .time-text {
-  margin: 0 0 6px;
-  color: #6b7280;
+  margin: 0;
+  color: #4b5563;
   font-size: 14px;
+  line-height: 1.6;
+}
+
+.tag-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  font-size: 12px;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 999px;
+  padding: 5px 10px;
 }
 
 .card-actions {
-  display: flex;
-  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.card-actions button {
+  width: 100%;
 }
 
 .modal-overlay {
@@ -592,52 +561,58 @@ onMounted(async () => {
   inset: 0;
   background: rgba(17, 24, 39, 0.45);
   display: flex;
-  justify-content: center;
   align-items: center;
-  padding: 20px;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
 }
 
 .modal-card {
   width: 100%;
   max-width: 460px;
   background: #fff;
-  border-radius: 20px;
+  border-radius: 18px;
   padding: 20px;
 }
 
 .modal-card h3 {
-  margin-top: 0;
-  margin-bottom: 16px;
+  margin: 0 0 16px;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.modal-field span {
+  font-size: 13px;
+  color: #374151;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 18px;
 }
 
-.ghost-btn {
-  background: #e5e7eb !important;
-  color: #111827 !important;
-}
+@media (max-width: 720px) {
+  .idle-market-page {
+    padding: 16px;
+  }
 
-@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+  }
+
   .toolbar {
     grid-template-columns: 1fr;
   }
 
-  .my-status-top {
+  .modal-actions {
     flex-direction: column;
-    align-items: stretch;
-  }
-
-  .my-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .card-list {
-    grid-template-columns: 1fr;
   }
 }
 </style>
