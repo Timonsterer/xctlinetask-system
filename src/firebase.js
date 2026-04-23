@@ -12,6 +12,20 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
+if (
+  !firebaseConfig.apiKey ||
+  !firebaseConfig.authDomain ||
+  !firebaseConfig.projectId ||
+  !firebaseConfig.storageBucket ||
+  !firebaseConfig.messagingSenderId ||
+  !firebaseConfig.appId
+) {
+  throw new Error('Firebase 環境變數未完整設定，請檢查 .env')
+}
+
+console.log('Firebase projectId:', firebaseConfig.projectId)
+console.log('Firebase authDomain:', firebaseConfig.authDomain)
+
 const app = initializeApp(firebaseConfig)
 
 const db = getFirestore(app)
