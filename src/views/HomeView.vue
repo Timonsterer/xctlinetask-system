@@ -108,14 +108,18 @@ async function initPage() {
 
     profile.value = lineProfile
 
-    const userId = lineProfile.userId || lineProfile.lineUserId
+   const userId = lineProfile.userId || lineProfile.lineUserId
 
-    console.log('LIFF profile =', lineProfile)
-    console.log('Firestore users doc id =', userId)
+   console.log('LIFF profile =', lineProfile)
+   console.log('Firestore users doc id =', userId)
 
-    if (!userId) {
-      throw new Error('抓不到 LINE userId')
-    }
+   if (!userId) {
+   throw new Error('抓不到 LINE userId')
+   }
+
+   localStorage.setItem('userId', userId)
+   localStorage.setItem('lineUserId', userId)
+   localStorage.setItem('line_user_id', userId)
 
     const userRef = doc(db, 'users', userId)
     const userSnap = await getDoc(userRef)
@@ -136,12 +140,16 @@ async function initPage() {
 }
 
 async function bindAccount() {
-  const userId = profile.value?.userId || profile.value?.lineUserId
+const userId = profile.value?.userId || profile.value?.lineUserId
 
-  if (!userId) {
-    error.value = '找不到 LINE 使用者資料'
-    return
-  }
+if (!userId) {
+  error.value = '找不到 LINE 使用者資料'
+  return
+}
+
+localStorage.setItem('userId', userId)
+localStorage.setItem('lineUserId', userId)
+localStorage.setItem('line_user_id', userId)
 
   if (!nickname.value) {
     error.value = '請先輸入暱稱'
