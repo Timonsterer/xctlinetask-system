@@ -211,8 +211,29 @@ const filteredPosts = computed(() => {
   return idlePosts.value.filter((post) => {
     if (post.isActive === false) return false
 
-    const ownerId = post.ownerId || post.userId || ''
-    if (ownerId && ownerId === currentUser.value.id) return false
+const filteredPosts = computed(() => {
+  const kw = keyword.value.toLowerCase()
+
+  return idlePosts.value.filter((post) => {
+    if (post.isActive === false) return false
+
+    const text = [
+      post.ownerName || '',
+      post.location || '',
+      post.title || '',
+      post.description || '',
+      ...(Array.isArray(post.tags) ? post.tags : []),
+    ]
+      .join(' ')
+      .toLowerCase()
+
+    const matchKeyword = !kw || text.includes(kw)
+    const matchType =
+      filterType.value === 'all' || post.type === filterType.value
+
+    return matchKeyword && matchType
+  })
+})
 
     const text = [
       post.ownerName || '',
