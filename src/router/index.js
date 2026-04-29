@@ -20,6 +20,9 @@ import ContactDetailView from '@/views/ContactDetailView.vue'
 import LifeTemplateListView from '@/views/LifeTemplateListView.vue'
 import LifeTemplateDetailView from '@/views/LifeTemplateDetailView.vue'
 
+// 多人副本
+import RaidView from '@/views/RaidView.vue'
+
 const routes = [
   {
     path: '/',
@@ -52,6 +55,7 @@ const routes = [
     name: 'task-form',
     component: TaskFormView,
   },
+
   {
     path: '/task-history',
     name: 'task-history',
@@ -63,6 +67,7 @@ const routes = [
     name: 'idle-form',
     component: IdleFormView,
   },
+
   {
     path: '/idle-market',
     name: 'idle-market',
@@ -70,21 +75,30 @@ const routes = [
   },
 
   {
+    path: '/raid',
+    name: 'raid',
+    component: RaidView,
+  },
+
+  {
     path: '/contacts',
     name: 'contacts',
     component: ContactListView,
   },
+
   {
     path: '/contacts/new',
     name: 'contact-new',
     component: ContactFormView,
   },
+
   {
     path: '/contacts/:id',
     name: 'contact-detail',
     component: ContactDetailView,
     props: true,
   },
+
   {
     path: '/contacts/:id/edit',
     name: 'contact-edit',
@@ -97,6 +111,7 @@ const routes = [
     name: 'life-templates',
     component: LifeTemplateListView,
   },
+
   {
     path: '/life-templates/:id',
     name: 'life-template-detail',

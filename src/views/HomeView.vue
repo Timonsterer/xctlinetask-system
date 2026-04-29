@@ -161,6 +161,7 @@
           <button class="secondary-btn" @click="goTaskHistory">任務紀錄</button>
           <button class="secondary-btn" @click="goIdleForm">我很閒</button>
           <button class="secondary-btn" @click="goIdleMarket">閒置列表</button>
+          <button class="home-btn" @click="router.push('/raid')">👥 多人副本</button>
         </div>
       </template>
     </div>

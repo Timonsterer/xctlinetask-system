@@ -30,6 +30,27 @@
           </div>
 
           <div class="form-group">
+            <label class="switch-row">
+              <input v-model="form.isMultiRaid" type="checkbox" />
+              <span>多人副本</span>
+            </label>
+            <div class="hint">
+              勾選後，這個任務會出現在「多人副本」頁面，讓其他人報名。
+            </div>
+          </div>
+
+          <div v-if="form.isMultiRaid" class="form-group">
+            <label for="requiredPeople">副本需求人數</label>
+            <input
+              id="requiredPeople"
+              v-model.number="form.requiredPeople"
+              type="number"
+              min="1"
+              placeholder="例如：3"
+            />
+          </div>
+
+          <div class="form-group">
             <label for="quickTime">快速時間（HHMM-MMDD）</label>
             <input
               id="quickTime"
@@ -141,6 +162,8 @@ const form = reactive({
   duration: '0030',
   note: '',
   pinAsCurrent: true,
+  isMultiRaid: false,
+  requiredPeople: 2,
 })
 
 const taskId = computed(() => route.query.id || '')
@@ -152,6 +175,15 @@ const getUserId = () => {
     localStorage.getItem('lineUserId') ||
     localStorage.getItem('line_user_id') ||
     ''
+  )
+}
+
+const getUserName = () => {
+  return (
+    localStorage.getItem('displayName') ||
+    localStorage.getItem('lineDisplayName') ||
+    localStorage.getItem('line_display_name') ||
+    '匿名使用者'
   )
 }
 
@@ -328,6 +360,8 @@ const loadTask = async () => {
     form.quickTime = data.quickTime || data.rawTimeInput || ''
     form.duration = data.durationText || data.rawDurationInput || '0030'
     form.pinAsCurrent = data.isCurrent !== false && normalizeStatus(data) !== 'done'
+    form.isMultiRaid = !!data.isMultiRaid
+    form.requiredPeople = data.requiredPeople || 2
 
     const startSource = data.startAt || data.dueAt || data.startText
     if (startSource?.toDate) {
@@ -344,17 +378,6 @@ const loadTask = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const fetchPendingTaskDocs = async (fieldName, userId) => {
-  const q = query(
-    collection(db, 'tasks'),
-    where(fieldName, '==', userId),
-    where('status', 'in', ['pending', 'completed', 'done'])
-  )
-
-  const snap = await getDocs(q)
-  return snap.docs
 }
 
 const demoteOtherPendingTasks = async () => {
@@ -401,6 +424,32 @@ const demoteOtherPendingTasks = async () => {
   await Promise.all(jobs)
 }
 
+const createRaidFromTask = async ({ taskDocId, payload }) => {
+  if (!form.isMultiRaid) return
+
+  const requiredPeople = Number(form.requiredPeople) || 1
+
+  await addDoc(collection(db, 'multi_raids'), {
+    taskId: taskDocId,
+    title: payload.title,
+    note: payload.note || '',
+    requiredPeople,
+    joinedUsers: [],
+    joinedCount: 0,
+    status: 'open',
+
+    ownerId: payload.ownerId,
+    ownerName: getUserName(),
+
+    startAt: payload.startAt,
+    endAt: payload.endAt,
+    dueAt: payload.dueAt,
+
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
 const handleSubmit = async () => {
   resetMessage()
 
@@ -412,6 +461,11 @@ const handleSubmit = async () => {
 
   if (!form.title) {
     error.value = '請填寫任務名稱'
+    return
+  }
+
+  if (form.isMultiRaid && (!form.requiredPeople || Number(form.requiredPeople) < 1)) {
+    error.value = '請填寫正確的副本需求人數'
     return
   }
 
@@ -437,7 +491,10 @@ const handleSubmit = async () => {
 
       title: form.title,
       note: form.note || '',
-      type: 'key',
+      type: form.isMultiRaid ? 'multi_raid' : 'key',
+
+      isMultiRaid: !!form.isMultiRaid,
+      requiredPeople: form.isMultiRaid ? Number(form.requiredPeople) || 1 : null,
 
       quickTime: form.quickTime || '',
       rawTimeInput: form.quickTime || '',
@@ -462,11 +519,19 @@ const handleSubmit = async () => {
       await updateDoc(doc(db, 'tasks', String(taskId.value)), payload)
       success.value = '任務已更新'
     } else {
-      await addDoc(collection(db, 'tasks'), {
+      const taskRef = await addDoc(collection(db, 'tasks'), {
         ...payload,
         createdAt: serverTimestamp(),
       })
-      success.value = '任務已建立'
+
+      await createRaidFromTask({
+        taskDocId: taskRef.id,
+        payload,
+      })
+
+      success.value = form.isMultiRaid
+        ? '任務已建立，並已發布到多人副本'
+        : '任務已建立'
     }
 
     setTimeout(() => {
@@ -646,6 +711,10 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-weight: 700;
+}
+
+.switch-row input {
+  width: auto;
 }
 
 .actions {
