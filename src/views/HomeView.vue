@@ -12,6 +12,58 @@
         <button class="primary-btn" @click="initPage">重新載入</button>
       </template>
 
+      <template v-else-if="!termsAccepted">
+        <h1>使用前請先閱讀免責聲明</h1>
+
+        <section class="terms-box">
+          <p class="warning-text">
+            ⚠️ 請務必詳閱以下內容。若不同意，請立即停止使用本平台。
+          </p>
+
+          <p>
+            本平台僅提供任務媒合與資訊交流功能，使用者於平台上發布、接受、
+            參與任務或與他人互動，均屬個人行為。
+          </p>
+
+          <p>
+            使用者不得利用本平台從事任何違法、詐騙、洗錢、毒品、色情、
+            暴力、非法交易、危害他人安全或其他違反法律與善良風俗之行為。
+          </p>
+
+          <p>
+            若使用者有上述違法或不當行為，所有法律責任、民事責任、
+            刑事責任、損害賠償及相關糾紛，均由使用者自行承擔，
+            本平台一概不負責。
+          </p>
+
+          <p>
+            本平台不介入使用者之間的金錢交易、實際見面、私人邀約或任務履行。
+            使用者應自行評估風險並確保自身安全。
+          </p>
+
+          <p>
+            本平台有權刪除違規內容、限制或停權帳號，必要時得配合司法或相關單位調查。
+          </p>
+
+          <p class="strong">
+            使用本平台即表示您已閱讀、理解並同意本免責聲明與使用須知。
+          </p>
+        </section>
+
+        <label class="agree-row">
+          <input v-model="agreeChecked" type="checkbox" />
+          <span>我已閱讀並同意上述免責聲明與使用須知</span>
+        </label>
+
+        <button
+          class="primary-btn"
+          :disabled="!agreeChecked"
+          @click="acceptTerms"
+        >
+          同意並開始使用
+        </button>
+      </template>
+
       <template v-else-if="!isBound">
         <h1>歡迎使用</h1>
 
@@ -193,6 +245,9 @@ const binding = ref(false)
 const switchingTask = ref(false)
 const error = ref('')
 
+const termsAccepted = ref(localStorage.getItem('termsAccepted') === 'true')
+const agreeChecked = ref(false)
+
 const profile = ref(null)
 const isBound = ref(false)
 const nickname = ref('')
@@ -204,6 +259,13 @@ const pendingTasks = ref([])
 
 const idlePublishedActive = ref(false)
 const pendingInviteCount = ref(0)
+
+function acceptTerms() {
+  if (!agreeChecked.value) return
+  localStorage.setItem('termsAccepted', 'true')
+  localStorage.setItem('termsAcceptedAt', new Date().toISOString())
+  termsAccepted.value = true
+}
 
 function getUserId() {
   return (
@@ -647,6 +709,45 @@ h1 {
   margin-bottom: 16px;
 }
 
+.terms-box {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 16px;
+  margin: 16px 0;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  line-height: 1.7;
+  color: #334155;
+}
+
+.warning-text {
+  color: #b45309;
+  font-weight: 800;
+}
+
+.strong {
+  font-weight: 800;
+  color: #111827;
+}
+
+.agree-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 16px 0;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.5;
+}
+
+.agree-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
 .profile-box {
   margin: 20px 0;
   padding: 16px;
@@ -777,7 +878,8 @@ h1 {
 
 .next-task-btn,
 .primary-btn,
-.secondary-btn {
+.secondary-btn,
+.home-btn {
   border: none;
   border-radius: 14px;
   padding: 12px 18px;
@@ -799,7 +901,8 @@ h1 {
 
 .next-task-btn:disabled,
 .primary-btn:disabled,
-.secondary-btn:disabled {
+.secondary-btn:disabled,
+.home-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -917,6 +1020,15 @@ h1 {
 
 .secondary-btn:hover:not(:disabled) {
   background: #cbd5e1;
+}
+
+.home-btn {
+  background: #111827;
+  color: #ffffff;
+}
+
+.home-btn:hover:not(:disabled) {
+  background: #374151;
 }
 
 @media (max-width: 640px) {
