@@ -79,7 +79,7 @@
 
             <button
               class="decline-btn"
-              @click="updateInviteStatus(invite, 'declined')"
+              @click="updateInviteStatus(invite, 'rejected')"
               :disabled="actingInviteId === invite.id"
             >
               {{ actingInviteId === invite.id ? '處理中...' : '拒絕' }}
