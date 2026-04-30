@@ -11,9 +11,7 @@ export async function initLiff() {
     throw new Error('VITE_LIFF_ID 未設定，請檢查 .env')
   }
 
-  await liff.init({
-    liffId,
-  })
+  await liff.init({ liffId })
 
   liffReady = true
   return liff
@@ -27,7 +25,9 @@ export async function ensureLiffReady() {
 export async function getLiffProfile() {
   await initLiff()
 
+  // 🔥 關鍵修正
   if (!liff.isLoggedIn()) {
+    liff.login()
     return null
   }
 
