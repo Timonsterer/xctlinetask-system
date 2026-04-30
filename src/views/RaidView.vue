@@ -16,13 +16,10 @@
         v-for="raid in raids"
         :key="raid.id"
         class="card"
-        :class="{ closed: raid.status !== 'open' }"
       >
         <div class="card-head">
           <h2>{{ raid.title }}</h2>
-          <span class="status" :class="raid.status">
-            {{ getStatusText(raid.status) }}
-          </span>
+          <span class="status open">招募中</span>
         </div>
 
         <p class="desc">
@@ -50,7 +47,6 @@
 
         <div v-if="isOwner(raid)" class="owner-actions">
           <button
-            v-if="raid.status === 'open'"
             class="btn warning"
             @click="closeRaid(raid)"
           >
@@ -58,7 +54,6 @@
           </button>
 
           <button
-            v-if="raid.status !== 'cancelled'"
             class="btn danger"
             @click="cancelRaid(raid)"
           >
@@ -68,7 +63,7 @@
 
         <div v-else>
           <button
-            v-if="raid.status === 'open' && !hasJoined(raid)"
+            v-if="!hasJoined(raid)"
             class="btn"
             @click="joinRaid(raid)"
           >
@@ -76,19 +71,11 @@
           </button>
 
           <button
-            v-else-if="raid.status === 'open' && hasJoined(raid)"
-            class="btn joined"
-            disabled
-          >
-            已報名
-          </button>
-
-          <button
             v-else
             class="btn joined"
             disabled
           >
-            已截止
+            已報名
           </button>
         </div>
       </div>
@@ -104,8 +91,10 @@ import {
   getDocs,
   doc,
   updateDoc,
+  deleteDoc,
   arrayUnion,
   query,
+  where,
   orderBy,
   serverTimestamp
 } from 'firebase/firestore'
@@ -134,6 +123,7 @@ const loadRaids = async () => {
   try {
     const q = query(
       collection(db, 'multi_raids'),
+      where('status', '==', 'open'),
       orderBy('createdAt', 'desc')
     )
 
@@ -141,7 +131,6 @@ const loadRaids = async () => {
 
     raids.value = snap.docs.map(docSnap => ({
       id: docSnap.id,
-      status: 'open',
       joinedUsers: [],
       ...docSnap.data()
     }))
@@ -151,14 +140,6 @@ const loadRaids = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const getStatusText = (status) => {
-  if (status === 'open') return '招募中'
-  if (status === 'full') return '已額滿'
-  if (status === 'closed') return '已截止'
-  if (status === 'cancelled') return '已取消'
-  return '未知'
 }
 
 const isOwner = (raid) => {
@@ -176,25 +157,41 @@ const joinRaid = async (raid) => {
     return
   }
 
-  if (raid.status !== 'open') {
-    alert('這個副本已截止或已取消')
-    return
-  }
-
   if (hasJoined(raid)) {
     alert('你已經報名過了')
     return
   }
 
   const currentCount = raid.joinedUsers?.length || 0
-  const limit = raid.requiredPeople || 1
+  const limit = Number(raid.requiredPeople || 1)
 
   if (currentCount >= limit) {
     alert('這個副本人數已滿')
+    await deleteDoc(doc(db, 'multi_raids', raid.id))
+    await loadRaids()
     return
   }
 
+  const newCount = currentCount + 1
   const raidRef = doc(db, 'multi_raids', raid.id)
+
+  if (newCount >= limit) {
+    await updateDoc(raidRef, {
+      joinedUsers: arrayUnion({
+        userId,
+        userName,
+        joinedAt: new Date()
+      }),
+      joinedCount: newCount,
+      status: 'full',
+      fullAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    })
+
+    alert('報名成功，人數已滿，副本已結束')
+    await loadRaids()
+    return
+  }
 
   await updateDoc(raidRef, {
     joinedUsers: arrayUnion({
@@ -202,7 +199,7 @@ const joinRaid = async (raid) => {
       userName,
       joinedAt: new Date()
     }),
-    joinedCount: currentCount + 1,
+    joinedCount: newCount,
     updatedAt: serverTimestamp()
   })
 
@@ -216,16 +213,12 @@ const closeRaid = async (raid) => {
     return
   }
 
-  const ok = confirm(`確定要截止「${raid.title}」報名嗎？`)
+  const ok = confirm(`確定要截止「${raid.title}」報名嗎？截止後不會留下紀錄。`)
   if (!ok) return
 
-  await updateDoc(doc(db, 'multi_raids', raid.id), {
-    status: 'closed',
-    closedAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  })
+  await deleteDoc(doc(db, 'multi_raids', raid.id))
 
-  alert('已截止報名')
+  alert('已截止並刪除任務')
   await loadRaids()
 }
 
@@ -235,16 +228,12 @@ const cancelRaid = async (raid) => {
     return
   }
 
-  const ok = confirm(`確定要取消「${raid.title}」嗎？`)
+  const ok = confirm(`確定要取消「${raid.title}」嗎？取消後不會留下紀錄。`)
   if (!ok) return
 
-  await updateDoc(doc(db, 'multi_raids', raid.id), {
-    status: 'cancelled',
-    cancelledAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  })
+  await deleteDoc(doc(db, 'multi_raids', raid.id))
 
-  alert('已取消任務')
+  alert('已取消並刪除任務')
   await loadRaids()
 }
 
@@ -288,10 +277,6 @@ h1 {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
-.card.closed {
-  opacity: 0.75;
-}
-
 .card-head {
   display: flex;
   align-items: flex-start;
@@ -309,28 +294,11 @@ h1 {
   font-size: 13px;
   padding: 5px 9px;
   border-radius: 999px;
-  background: #e5e7eb;
-  color: #374151;
 }
 
 .status.open {
   background: #dcfce7;
   color: #166534;
-}
-
-.status.full {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status.closed {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.status.cancelled {
-  background: #fee2e2;
-  color: #991b1b;
 }
 
 .desc {
