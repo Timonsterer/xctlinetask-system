@@ -93,13 +93,23 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-
 const currentTask = ref(null)
 
-const goTaskForm = () => router.push('/task-form')
-const goTaskHistory = () => router.push('/task-history')
-const goIdleForm = () => router.push('/idle-form')
-const goIdleMarket = () => router.push('/idle-market')
+function checkLogin() {
+  const userId = localStorage.getItem('lineUserId')
+
+  if (!userId) {
+    router.replace('/bind')
+    return false
+  }
+
+  return true
+}
+
+const goTaskForm = () => router.push('/task/new')
+const goTaskHistory = () => router.push('/task/history')
+const goIdleForm = () => router.push('/idle/new')
+const goIdleMarket = () => router.push('/idle/market')
 const goContacts = () => router.push('/contacts')
 const goLifeTemplates = () => router.push('/life-templates')
 const goPocketPlaces = () => router.push('/pocket-places')
@@ -110,6 +120,8 @@ const goNextTask = () => {
 }
 
 onMounted(() => {
+  if (!checkLogin()) return
+
   currentTask.value = null
 })
 </script>

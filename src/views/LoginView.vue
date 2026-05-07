@@ -2,12 +2,12 @@
   <div class="login-page">
     <div class="card">
       <h1>登入中...</h1>
-      <p class="desc">正在前往系統首頁</p>
+      <p class="desc">正在檢查 LINE 登入狀態</p>
 
       <p v-if="error" class="error">{{ error }}</p>
 
-      <button v-if="error" class="primary-btn" @click="goHome">
-        重新前往首頁
+      <button v-if="error" class="primary-btn" @click="goBind">
+        重新登入 LINE
       </button>
     </div>
   </div>
@@ -20,16 +20,23 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const error = ref('')
 
-function goHome() {
-  router.replace('/home')
+function goBind() {
+  router.replace('/bind')
 }
 
 onMounted(() => {
   try {
+    const userId = localStorage.getItem('lineUserId')
+
+    if (!userId) {
+      router.replace('/bind')
+      return
+    }
+
     router.replace('/home')
   } catch (err) {
-    console.error('LoginView redirect error:', err)
-    error.value = err?.message || '頁面跳轉失敗'
+    console.error('LoginView error:', err)
+    error.value = err?.message || '登入檢查失敗'
   }
 })
 </script>

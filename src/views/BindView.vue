@@ -1,10 +1,14 @@
 <template>
   <div class="bind-page">
     <div class="card">
-      <h1>綁定中...</h1>
+      <h1>LINE 綁定中...</h1>
 
       <p v-if="loading">正在取得 LINE 資料</p>
       <p v-if="error" class="error">{{ error }}</p>
+
+      <button v-if="error" class="primary-btn" @click="retryLogin">
+        重新登入
+      </button>
     </div>
   </div>
 </template>
@@ -20,11 +24,18 @@ const router = useRouter()
 const loading = ref(true)
 const error = ref('')
 
+function retryLogin() {
+  localStorage.removeItem('lineUserId')
+  location.reload()
+}
+
 onMounted(async () => {
   try {
+    loading.value = true
+    error.value = ''
+
     const profile = await getLiffProfile()
 
-    // 🔥 如果還沒登入 → getLiffProfile 會觸發 login
     if (!profile) {
       return
     }
@@ -35,39 +46,38 @@ onMounted(async () => {
       throw new Error('無法取得 LINE userId')
     }
 
-    // 存到 localStorage（你整個系統都靠這個）
     localStorage.setItem('lineUserId', userId)
 
     const userRef = doc(db, 'users', userId)
     const snap = await getDoc(userRef)
 
     if (!snap.exists()) {
-      // 新使用者
       await setDoc(userRef, {
         userId,
-        displayName: profile.displayName,
-        pictureUrl: profile.pictureUrl,
+        lineUserId: userId,
+        displayName: profile.displayName || '',
+        pictureUrl: profile.pictureUrl || '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
     } else {
-      // 更新資料
       await setDoc(
         userRef,
         {
-          displayName: profile.displayName,
-          pictureUrl: profile.pictureUrl,
+          userId,
+          lineUserId: userId,
+          displayName: profile.displayName || '',
+          pictureUrl: profile.pictureUrl || '',
           updatedAt: serverTimestamp(),
         },
         { merge: true }
       )
     }
 
-    // ✅ 成功 → 進首頁
     router.replace('/home')
   } catch (err) {
-    console.error(err)
-    error.value = err.message || '綁定失敗'
+    console.error('BindView error:', err)
+    error.value = err?.message || 'LINE 綁定失敗'
     loading.value = false
   }
 })
@@ -80,14 +90,17 @@ onMounted(async () => {
   justify-content: center;
   align-items: center;
   background: linear-gradient(180deg, #f8fafc, #e2e8f0);
+  padding: 20px;
 }
 
 .card {
+  width: 100%;
+  max-width: 420px;
   background: white;
   padding: 30px;
   border-radius: 16px;
   text-align: center;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
@@ -95,6 +108,20 @@ h1 {
 }
 
 .error {
-  color: red;
+  color: #dc2626;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+.primary-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
 }
 </style>
