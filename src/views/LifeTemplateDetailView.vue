@@ -33,14 +33,22 @@
           </p>
 
           <div class="tag-row" v-if="templateData.tags?.length">
-            <span
-              v-for="tag in templateData.tags"
-              :key="tag"
-              class="tag-chip"
-            >
+            <span v-for="tag in templateData.tags" :key="tag" class="tag-chip">
               #{{ tag }}
             </span>
           </div>
+
+          <div class="apply-box">
+            <button class="apply-btn" :disabled="applying" @click="applyTemplateToTasks">
+              {{ applying ? '套用中...' : '一鍵套用成我的任務' }}
+            </button>
+            <p class="apply-hint">
+              會自動把「每日節奏＋執行重點」加入你的任務清單。
+            </p>
+          </div>
+
+          <p v-if="success" class="success-text">{{ success }}</p>
+          <p v-if="error" class="error-text">{{ error }}</p>
         </div>
       </div>
 
@@ -91,11 +99,17 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore'
+import { db } from '@/firebase'
 
 const router = useRouter()
 const route = useRoute()
+
+const applying = ref(false)
+const success = ref('')
+const error = ref('')
 
 const templates = [
   {
@@ -228,6 +242,111 @@ const templateData = computed(() => {
   const id = String(route.params.id || '')
   return templates.find((item) => item.id === id) || null
 })
+
+function getUserId() {
+  return (
+    localStorage.getItem('userId') ||
+    localStorage.getItem('lineUserId') ||
+    localStorage.getItem('line_user_id') ||
+    ''
+  )
+}
+
+function getStartDate(index) {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() + 30 + index * 30)
+  now.setSeconds(0, 0)
+  return now
+}
+
+function getEndDate(startDate) {
+  return new Date(startDate.getTime() + 30 * 60 * 1000)
+}
+
+async function applyTemplateToTasks() {
+  error.value = ''
+  success.value = ''
+
+  const userId = getUserId()
+
+  if (!userId) {
+    router.push('/bind')
+    return
+  }
+
+  if (!templateData.value) {
+    error.value = '找不到套版'
+    return
+  }
+
+  applying.value = true
+
+  try {
+    const taskItems = [
+      ...(templateData.value.dailyFlow || []),
+      ...(templateData.value.actions || [])
+    ]
+
+    const cleanItems = [...new Set(taskItems)].filter(Boolean)
+
+    if (!cleanItems.length) {
+      error.value = '這個套版沒有可建立的任務'
+      return
+    }
+
+    await Promise.all(
+      cleanItems.map((item, index) => {
+        const startDate = getStartDate(index)
+        const endDate = getEndDate(startDate)
+
+        return addDoc(collection(db, 'tasks'), {
+          userId,
+          ownerId: userId,
+
+          title: item,
+          note: `來自「${templateData.value.name}」生活套版`,
+          type: 'life_template',
+
+          templateId: templateData.value.id,
+          templateName: templateData.value.name,
+
+          isMultiRaid: false,
+          requiredPeople: null,
+
+          quickTime: '',
+          rawTimeInput: '',
+          durationText: '0030',
+          rawDurationInput: '0030',
+          durationMinutes: 30,
+
+          startAt: Timestamp.fromDate(startDate),
+          endAt: Timestamp.fromDate(endDate),
+          dueAt: Timestamp.fromDate(startDate),
+
+          startText: startDate.toISOString(),
+          endText: endDate.toISOString(),
+
+          status: 'pending',
+          isCurrent: index === 0,
+          completedAt: null,
+
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        })
+      })
+    )
+
+    success.value = `已建立 ${cleanItems.length} 個任務`
+    setTimeout(() => {
+      router.push('/home')
+    }, 600)
+  } catch (err) {
+    console.error(err)
+    error.value = '套用失敗，請檢查 Firestore 權限'
+  } finally {
+    applying.value = false
+  }
+}
 
 function goBack() {
   router.push('/life-templates')
@@ -365,6 +484,49 @@ function typeLabel(type) {
   background: #f3f4f6;
   color: #374151;
   font-size: 12px;
+}
+
+.apply-box {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+}
+
+.apply-btn {
+  width: 100%;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.apply-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.apply-hint {
+  margin: 10px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.success-text {
+  margin: 12px 0 0;
+  color: #047857;
+  font-weight: 700;
+}
+
+.error-text {
+  margin: 12px 0 0;
+  color: #dc2626;
+  font-weight: 700;
 }
 
 .content-grid {

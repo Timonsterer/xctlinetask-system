@@ -1,301 +1,208 @@
 <template>
-  <div class="life-template-list-page">
+  <div class="life-template-page">
     <header class="page-header">
-      <div>
-        <h1>人物套版列表</h1>
-        <p>挑一個你想模仿的生活／訓練模式。</p>
-      </div>
+      <h1>人物生活套版</h1>
+      <p>選一個角色，直接套用成你的任務節奏</p>
     </header>
 
-    <section class="toolbar">
-      <input
-        v-model.trim="keyword"
-        type="text"
-        class="search-input"
-        placeholder="搜尋人物名稱、類型、關鍵字"
-      />
-
-      <select v-model="filterType" class="filter-select">
-        <option value="all">全部類型</option>
-        <option value="fitness">健身</option>
-        <option value="business">事業</option>
-        <option value="study">學習</option>
-        <option value="lifestyle">生活</option>
-      </select>
-    </section>
-
-    <section v-if="filteredTemplates.length === 0" class="state-box">
-      目前沒有套版資料
-    </section>
-
-    <section v-else class="template-grid">
-      <article
-        v-for="item in filteredTemplates"
+    <div class="grid">
+      <div
+        v-for="item in templates"
         :key="item.id"
-        class="template-card"
+        class="card"
         @click="goDetail(item.id)"
       >
-        <div class="cover-wrap">
-          <img
-            v-if="item.cover"
-            :src="item.cover"
-            :alt="item.name"
-            class="cover-img"
-          />
-          <div v-else class="cover-placeholder">
-            {{ getInitial(item.name) }}
+        <div class="cover">
+          <img v-if="item.cover" :src="item.cover" />
+          <div v-else class="placeholder">
+            {{ item.name.slice(0, 1) }}
           </div>
         </div>
 
-        <div class="card-body">
+        <div class="content">
           <div class="title-row">
-            <h3>{{ item.name }}</h3>
-            <span class="type-badge">{{ typeLabel(item.type) }}</span>
+            <h2>{{ item.name }}</h2>
+            <span class="type">{{ typeLabel(item.type) }}</span>
           </div>
 
-          <p class="summary-text">
-            {{ item.summary || '暫無介紹' }}
+          <p class="summary">
+            {{ item.summary }}
           </p>
 
-          <div class="tag-row" v-if="item.tags?.length">
-            <span
-              v-for="tag in item.tags"
-              :key="tag"
-              class="tag-chip"
-            >
+          <div class="tags">
+            <span v-for="tag in item.tags" :key="tag">
               #{{ tag }}
             </span>
           </div>
+
+          <button class="apply-btn" @click.stop="quickApply(item)">
+            ⚡ 一鍵直接套用
+          </button>
         </div>
-      </article>
-    </section>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore'
+import { db } from '@/firebase'
 
 const router = useRouter()
-const keyword = ref('')
-const filterType = ref('all')
 
-const templates = ref([
+const templates = [
   {
     id: 'peng-yuyan',
     name: '彭于晏',
     type: 'fitness',
-    summary: '高自律訓練型，重視體態、飲食控制、規律作息。',
-    cover: '',
-    tags: ['自律', '健身', '體態', '飲食']
+    summary: '高自律訓練型，控制飲食＋規律運動',
+    tags: ['健身', '自律'],
+    dailyFlow: ['起床', '運動', '飲食控制', '早睡'],
+    actions: ['重訓', '高蛋白飲食', '記錄體重']
   },
   {
     id: 'elon-musk',
     name: 'Elon Musk',
     type: 'business',
-    summary: '高強度工作型，重視執行力、決策速度、長工時投入。',
-    cover: '',
-    tags: ['創業', '工作強度', '執行力']
+    summary: '高強度工作流，專注輸出',
+    tags: ['創業', '效率'],
+    dailyFlow: ['規劃任務', '執行', '檢查'],
+    actions: ['只做最重要的事', '加速決策']
   },
   {
-    id: 'study-master',
+    id: 'study',
     name: '高效學習者',
     type: 'study',
-    summary: '以知識輸入、刻意練習、固定複盤為主的學習套版。',
-    cover: '',
-    tags: ['學習', '複盤', '專注']
-  },
-  {
-    id: 'minimal-life',
-    name: '極簡生活者',
-    type: 'lifestyle',
-    summary: '降低雜訊、簡化選擇、維持空間與行程整潔。',
-    cover: '',
-    tags: ['極簡', '生活管理', '整理']
+    summary: '專注＋複盤型學習',
+    tags: ['學習'],
+    dailyFlow: ['讀書', '測驗', '複盤'],
+    actions: ['做筆記', '檢查錯誤']
   }
-])
+]
 
-const filteredTemplates = computed(() => {
-  const kw = keyword.value.toLowerCase()
-
-  return templates.value.filter((item) => {
-    const hitKeyword =
-      !kw ||
-      (item.name || '').toLowerCase().includes(kw) ||
-      (item.summary || '').toLowerCase().includes(kw) ||
-      (item.type || '').toLowerCase().includes(kw) ||
-      (item.tags || []).some((tag) => String(tag).toLowerCase().includes(kw))
-
-    const hitType =
-      filterType.value === 'all' || item.type === filterType.value
-
-    return hitKeyword && hitType
-  })
-})
+function getUserId() {
+  return localStorage.getItem('lineUserId')
+}
 
 function goDetail(id) {
   router.push(`/life-templates/${id}`)
 }
 
-function getInitial(name) {
-  return (name || '?').slice(0, 1)
+function getStart(index) {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() + index * 30)
+  return d
+}
+
+function getEnd(start) {
+  return new Date(start.getTime() + 30 * 60000)
+}
+
+async function quickApply(item) {
+  const userId = getUserId()
+
+  if (!userId) {
+    router.push('/bind')
+    return
+  }
+
+  const tasks = [...item.dailyFlow, ...item.actions]
+
+  await Promise.all(
+    tasks.map((t, i) => {
+      const s = getStart(i)
+      const e = getEnd(s)
+
+      return addDoc(collection(db, 'tasks'), {
+        userId,
+        title: t,
+        template: item.name,
+
+        startAt: Timestamp.fromDate(s),
+        endAt: Timestamp.fromDate(e),
+
+        isCurrent: i === 0,
+        status: 'pending',
+
+        createdAt: serverTimestamp()
+      })
+    })
+  )
+
+  router.push('/home')
 }
 
 function typeLabel(type) {
   if (type === 'fitness') return '健身'
   if (type === 'business') return '事業'
   if (type === 'study') return '學習'
-  if (type === 'lifestyle') return '生活'
   return '其他'
 }
 </script>
 
 <style scoped>
-.life-template-list-page {
-  max-width: 1080px;
-  margin: 0 auto;
+.life-template-page {
   padding: 20px;
-  color: #1f2937;
 }
 
 .page-header {
   margin-bottom: 20px;
 }
 
-.page-header h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-}
-
-.page-header p {
-  margin: 0;
-  color: #6b7280;
-}
-
-.toolbar {
+.grid {
   display: grid;
-  grid-template-columns: 1.5fr 220px;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.search-input,
-.filter-select {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.state-box {
-  padding: 28px;
-  text-align: center;
-  background: #f9fafb;
-  border: 1px dashed #d1d5db;
-  border-radius: 16px;
-}
-
-.template-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
 }
 
-.template-card {
+.card {
+  background: white;
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #fff;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.1);
 }
 
-.template-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+.cover {
+  height: 140px;
+  background: #eee;
 }
 
-.cover-wrap {
-  width: 100%;
-  height: 180px;
-  background: #f3f4f6;
-}
-
-.cover-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
+.placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 100%;
   font-size: 40px;
-  font-weight: 700;
-  color: #6b7280;
 }
 
-.card-body {
-  padding: 16px;
+.content {
+  padding: 14px;
 }
 
 .title-row {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  margin-bottom: 10px;
 }
 
-.title-row h3 {
-  margin: 0;
-  font-size: 20px;
+.summary {
+  font-size: 14px;
+  color: #666;
 }
 
-.type-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #4338ca;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.summary-text {
-  margin: 0 0 12px;
-  color: #4b5563;
-  line-height: 1.6;
-}
-
-.tag-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #374151;
+.tags span {
+  margin-right: 6px;
   font-size: 12px;
 }
 
-@media (max-width: 768px) {
-  .toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .template-grid {
-    grid-template-columns: 1fr;
-  }
+.apply-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  border-radius: 10px;
 }
 </style>
