@@ -34,14 +34,41 @@
           備註：{{ raid.note }}
         </p>
 
+        <div class="contact-box">
+          <div class="contact-title">版主聯絡資訊</div>
+          <div class="contact-line">
+            <strong>{{ getOwnerName(raid) }}</strong>
+          </div>
+          <div class="contact-line">
+            {{ getOwnerContact(raid) }}
+          </div>
+        </div>
+
         <div v-if="raid.joinedUsers?.length" class="joined-list">
           <div class="joined-title">已報名名單</div>
+
           <div
             v-for="user in raid.joinedUsers"
             :key="user.userId"
             class="joined-user"
           >
-            {{ user.userName || '匿名使用者' }}
+            <div>
+              <strong>{{ user.userName || '匿名使用者' }}</strong>
+            </div>
+
+            <div
+              v-if="isOwner(raid)"
+              class="joined-contact"
+            >
+              聯絡方式：{{ user.contactText || '未提供' }}
+            </div>
+
+            <div
+              v-else-if="user.userId === userId"
+              class="joined-contact"
+            >
+              你的聯絡方式：{{ user.contactText || '未提供' }}
+            </div>
           </div>
         </div>
 
@@ -75,7 +102,7 @@
             class="btn joined"
             disabled
           >
-            已報名
+            已報名，可查看版主聯絡資訊
           </button>
         </div>
       </div>
@@ -117,6 +144,13 @@ const userName =
   localStorage.getItem('line_display_name') ||
   '匿名使用者'
 
+const userContact =
+  localStorage.getItem('contactText') ||
+  localStorage.getItem('phone') ||
+  localStorage.getItem('lineName') ||
+  userName ||
+  ''
+
 const loadRaids = async () => {
   loading.value = true
 
@@ -151,9 +185,30 @@ const hasJoined = (raid) => {
   return raid.joinedUsers.some(user => user.userId === userId)
 }
 
+const getOwnerName = (raid) => {
+  return (
+    raid.ownerName ||
+    raid.userName ||
+    raid.displayName ||
+    '任務版主'
+  )
+}
+
+const getOwnerContact = (raid) => {
+  return (
+    raid.ownerContact ||
+    raid.contactText ||
+    raid.contact ||
+    raid.phone ||
+    raid.lineName ||
+    '版主尚未提供聯絡資訊'
+  )
+}
+
 const joinRaid = async (raid) => {
   if (!userId) {
     alert('尚未取得使用者資料，請重新從 LINE 開啟')
+    router.push('/bind')
     return
   }
 
@@ -172,16 +227,28 @@ const joinRaid = async (raid) => {
     return
   }
 
+  const contactText = prompt(
+    '請輸入給版主看的聯絡方式，例如 LINE 名稱、電話、備註。可留空。',
+    userContact
+  ) || ''
+
+  if (contactText) {
+    localStorage.setItem('contactText', contactText)
+  }
+
   const newCount = currentCount + 1
   const raidRef = doc(db, 'multi_raids', raid.id)
 
+  const joinedUserData = {
+    userId,
+    userName,
+    contactText,
+    joinedAt: new Date()
+  }
+
   if (newCount >= limit) {
     await updateDoc(raidRef, {
-      joinedUsers: arrayUnion({
-        userId,
-        userName,
-        joinedAt: new Date()
-      }),
+      joinedUsers: arrayUnion(joinedUserData),
       joinedCount: newCount,
       status: 'full',
       fullAt: serverTimestamp(),
@@ -194,16 +261,12 @@ const joinRaid = async (raid) => {
   }
 
   await updateDoc(raidRef, {
-    joinedUsers: arrayUnion({
-      userId,
-      userName,
-      joinedAt: new Date()
-    }),
+    joinedUsers: arrayUnion(joinedUserData),
     joinedCount: newCount,
     updatedAt: serverTimestamp()
   })
 
-  alert('報名成功')
+  alert('報名成功，版主可以看到你的聯絡方式')
   await loadRaids()
 }
 
@@ -311,6 +374,24 @@ h1 {
   color: #777;
 }
 
+.contact-box {
+  margin-top: 12px;
+  padding: 12px;
+  background: #eef2ff;
+  border-radius: 12px;
+  color: #1e3a8a;
+}
+
+.contact-title {
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.contact-line {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 .joined-list {
   margin-top: 12px;
   padding: 12px;
@@ -327,7 +408,20 @@ h1 {
 .joined-user {
   font-size: 14px;
   color: #555;
-  margin: 4px 0;
+  margin: 8px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.joined-user:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.joined-contact {
+  margin-top: 4px;
+  color: #2563eb;
+  font-size: 13px;
 }
 
 .owner-actions {
