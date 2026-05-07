@@ -31,7 +31,7 @@ async function pushLine(to, text) {
 }
 
 // ==========================
-// 登入後檢查一次：沒有任務就提醒
+// 登入後檢查一次：已關閉空白任務通知
 // ==========================
 exports.checkNoTaskOnce = onCall(
   {
@@ -53,59 +53,8 @@ exports.checkNoTaskOnce = onCall(
       { merge: true }
     )
 
-    let hasCurrentTask = false
-
-    const q1 = await db
-      .collection('tasks')
-      .where('ownerId', '==', lineUserId)
-      .where('status', '==', 'pending')
-      .where('isCurrent', '==', true)
-      .limit(1)
-      .get()
-
-    if (!q1.empty) hasCurrentTask = true
-
-    if (!hasCurrentTask) {
-      const q2 = await db
-        .collection('tasks')
-        .where('userId', '==', lineUserId)
-        .where('status', '==', 'pending')
-        .where('isCurrent', '==', true)
-        .limit(1)
-        .get()
-
-      if (!q2.empty) hasCurrentTask = true
-    }
-
-    if (hasCurrentTask) {
-      return { success: true, notified: false }
-    }
-
-    try {
-      await pushLine(
-        lineUserId,
-        `目前沒有進行中的任務\n\n` +
-          `提醒你可以新增下一個任務。\n\n` +
-          `👉 點這裡回到任務首頁：\n${LIFF_URL}`
-      )
-
-      await userRef.set(
-        {
-          noTaskNotifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      )
-
-      return { success: true, notified: true }
-    } catch (err) {
-      logger.error('登入無任務提醒失敗', {
-        lineUserId,
-        message: err?.message,
-        response: err?.response?.data,
-      })
-
-      return { success: false, message: '推播失敗' }
-    }
+    // 空白任務通知已關閉
+    return { success: true, notified: false }
   }
 )
 
@@ -307,7 +256,7 @@ exports.onRaidUpdated = onDocumentUpdated(
 )
 
 // ==========================
-// 單人沒有進行中任務 → 每 12 小時提醒一次
+// 單人沒有進行中任務提醒：已關閉
 // ==========================
 exports.remindUsersWithoutCurrentTask = onSchedule(
   {
@@ -316,103 +265,7 @@ exports.remindUsersWithoutCurrentTask = onSchedule(
     timeZone: 'Asia/Taipei',
   },
   async () => {
-    const now = new Date()
-
-    const taipeiHour = Number(
-      new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Taipei',
-        hour: '2-digit',
-        hour12: false,
-      }).format(now)
-    )
-
-    if (taipeiHour >= 0 && taipeiHour < 7) {
-      logger.info('睡眠時間，不發送無任務提醒')
-      return
-    }
-
-    const usersSnap = await db.collection('users').limit(500).get()
-
-    const jobs = usersSnap.docs.map(async (userDoc) => {
-      const user = userDoc.data()
-
-      const lineUserId =
-        user.lineUserId ||
-        user.userId ||
-        user.lineId ||
-        userDoc.id
-
-      if (!lineUserId) return
-
-      const lastLoginAt = user.lastLoginAt?.toDate
-        ? user.lastLoginAt.toDate()
-        : null
-
-      if (lastLoginAt) {
-        const diffHours = (now.getTime() - lastLoginAt.getTime()) / 1000 / 60 / 60
-        if (diffHours < 2) return
-      }
-
-      const lastNotifiedAt = user.noTaskNotifiedAt?.toDate
-        ? user.noTaskNotifiedAt.toDate()
-        : null
-
-      if (lastNotifiedAt) {
-        const diffHours = (now.getTime() - lastNotifiedAt.getTime()) / 1000 / 60 / 60
-        if (diffHours < 12) return
-      }
-
-      let hasCurrentTask = false
-
-      const q1 = await db
-        .collection('tasks')
-        .where('ownerId', '==', lineUserId)
-        .where('status', '==', 'pending')
-        .where('isCurrent', '==', true)
-        .limit(1)
-        .get()
-
-      if (!q1.empty) hasCurrentTask = true
-
-      if (!hasCurrentTask) {
-        const q2 = await db
-          .collection('tasks')
-          .where('userId', '==', lineUserId)
-          .where('status', '==', 'pending')
-          .where('isCurrent', '==', true)
-          .limit(1)
-          .get()
-
-        if (!q2.empty) hasCurrentTask = true
-      }
-
-      if (hasCurrentTask) return
-
-      try {
-        await pushLine(
-          lineUserId,
-          `目前沒有進行中的任務\n\n` +
-            `提醒你可以安排下一步。\n\n` +
-            `👉 點這裡回到任務首頁：\n${LIFF_URL}`
-        )
-
-        await userDoc.ref.set(
-          {
-            noTaskNotifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        )
-
-        logger.info('無任務提醒成功', { lineUserId })
-      } catch (err) {
-        logger.error('無任務提醒失敗', {
-          lineUserId,
-          message: err?.message,
-          response: err?.response?.data,
-        })
-      }
-    })
-
-    await Promise.all(jobs)
+    logger.info('空白任務通知已關閉')
+    return
   }
 )
