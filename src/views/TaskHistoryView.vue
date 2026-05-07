@@ -13,35 +13,19 @@
 
     <div class="toolbar card">
       <div class="filter-group">
-        <button
-          class="tab-btn"
-          :class="{ active: filterStatus === 'all' }"
-          @click="filterStatus = 'all'"
-        >
+        <button class="tab-btn" :class="{ active: filterStatus === 'all' }" @click="filterStatus = 'all'">
           全部
         </button>
-        <button
-          class="tab-btn"
-          :class="{ active: filterStatus === 'pending' }"
-          @click="filterStatus = 'pending'"
-        >
+        <button class="tab-btn" :class="{ active: filterStatus === 'pending' }" @click="filterStatus = 'pending'">
           未完成
         </button>
-        <button
-          class="tab-btn"
-          :class="{ active: filterStatus === 'done' }"
-          @click="filterStatus = 'done'"
-        >
+        <button class="tab-btn" :class="{ active: filterStatus === 'done' }" @click="filterStatus = 'done'">
           已完成
         </button>
       </div>
 
       <div class="search-group">
-        <input
-          v-model.trim="keyword"
-          type="text"
-          placeholder="搜尋任務名稱或備註"
-        />
+        <input v-model.trim="keyword" type="text" placeholder="搜尋任務名稱或備註" />
       </div>
     </div>
 
@@ -56,26 +40,20 @@
       </div>
 
       <div v-else class="task-list">
-        <div
-          v-for="task in filteredTasks"
-          :key="task.key"
-          class="task-item"
-        >
+        <div v-for="task in filteredTasks" :key="task.key" class="task-item">
           <div class="task-main">
             <div class="task-top">
               <div class="task-title">
                 {{ task.title || '未命名任務' }}
               </div>
 
-              <div
-                class="status-badge"
-                :class="task.status === 'done' ? 'done' : 'pending'"
-              >
+              <div class="status-badge" :class="task.status === 'done' ? 'done' : 'pending'">
                 {{ task.status === 'done' ? '已完成' : '未完成' }}
               </div>
             </div>
 
             <div class="task-time">
+              <span v-if="task.type === 'life_template'">🔥 人物套版</span>
               <span v-if="task.startText">開始：{{ task.startText }}</span>
               <span v-if="task.endText">結束：{{ task.endText }}</span>
               <span v-if="task.dueText">排程：{{ task.dueText }}</span>
@@ -144,7 +122,6 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
@@ -163,8 +140,8 @@ const tasks = ref([])
 
 const getUserId = () => {
   return (
-    localStorage.getItem('userId') ||
     localStorage.getItem('lineUserId') ||
+    localStorage.getItem('userId') ||
     localStorage.getItem('line_user_id') ||
     ''
   )
@@ -199,6 +176,18 @@ const formatDateTime = (value) => {
   return `${yyyy}/${mm}/${dd} ${hh}:${mi}`
 }
 
+const getTimeValue = (value) => {
+  if (!value) return 0
+  if (typeof value?.toDate === 'function') return value.toDate().getTime()
+  if (typeof value?.toMillis === 'function') return value.toMillis()
+  if (value instanceof Date) return value.getTime()
+
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime())) return date.getTime()
+
+  return 0
+}
+
 const getDurationLabel = (task) => {
   if (task.durationText) return task.durationText
   if (task.rawDurationInput) return task.rawDurationInput
@@ -229,9 +218,9 @@ const normalizeTask = (id, data, source = 'tasks') => {
     ownerId: data.ownerId || '',
 
     taskId: data.taskId || '',
-    title: data.title || '',
+    title: data.title || data.content || data.name || '',
     note: data.note || '',
-    type: data.type || 'key',
+    type: data.type || data.source || 'manual',
 
     isCurrent: !!data.isCurrent,
 
@@ -239,6 +228,8 @@ const normalizeTask = (id, data, source = 'tasks') => {
     endAt: data.endAt || null,
     dueAt: data.dueAt || null,
     completedAt: data.completedAt || null,
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null,
 
     startText: formatDateTime(data.startAt || data.startText),
     endText: formatDateTime(data.endAt || data.endText),
@@ -291,46 +282,38 @@ const loadTasks = async () => {
     const taskDocs = new Map()
     const historyDocs = new Map()
 
-    // tasks - userId
     ;(
       await runSafeQuery(() =>
         query(
           collection(db, 'tasks'),
-          where('userId', '==', userId),
-          orderBy('updatedAt', 'desc')
+          where('userId', '==', userId)
         )
       )
     ).forEach((item) => taskDocs.set(item.id, item))
 
-    // tasks - ownerId
     ;(
       await runSafeQuery(() =>
         query(
           collection(db, 'tasks'),
-          where('ownerId', '==', userId),
-          orderBy('updatedAt', 'desc')
+          where('ownerId', '==', userId)
         )
       )
     ).forEach((item) => taskDocs.set(item.id, item))
 
-    // task_history - userId
     ;(
       await runSafeQuery(() =>
         query(
           collection(db, 'task_history'),
-          where('userId', '==', userId),
-          orderBy('completedAt', 'desc')
+          where('userId', '==', userId)
         )
       )
     ).forEach((item) => historyDocs.set(item.id, item))
 
-    // task_history - ownerId
     ;(
       await runSafeQuery(() =>
         query(
           collection(db, 'task_history'),
-          where('ownerId', '==', userId),
-          orderBy('completedAt', 'desc')
+          where('ownerId', '==', userId)
         )
       )
     ).forEach((item) => historyDocs.set(item.id, item))
@@ -343,7 +326,6 @@ const loadTasks = async () => {
       normalizeTask(item.id, item.data(), 'task_history')
     )
 
-    // 已完成任務以 task_history 為主，避免 tasks 與 task_history 重複顯示
     const completedTaskIdsInHistory = new Set(
       normalizedHistory.map((item) => item.taskId).filter(Boolean)
     )
@@ -363,33 +345,27 @@ const loadTasks = async () => {
     ]
 
     merged.sort((a, b) => {
-      const getTime = (item) => {
-        const source =
-          item.completedAt || item.dueAt || item.startAt || null
+      const aTime =
+        getTimeValue(a.completedAt) ||
+        getTimeValue(a.updatedAt) ||
+        getTimeValue(a.dueAt) ||
+        getTimeValue(a.startAt) ||
+        getTimeValue(a.createdAt)
 
-        if (typeof source?.toDate === 'function') {
-          return source.toDate().getTime()
-        }
+      const bTime =
+        getTimeValue(b.completedAt) ||
+        getTimeValue(b.updatedAt) ||
+        getTimeValue(b.dueAt) ||
+        getTimeValue(b.startAt) ||
+        getTimeValue(b.createdAt)
 
-        if (source instanceof Date) {
-          return source.getTime()
-        }
-
-        if (source) {
-          const date = new Date(source)
-          if (!Number.isNaN(date.getTime())) return date.getTime()
-        }
-
-        return 0
-      }
-
-      return getTime(b) - getTime(a)
+      return bTime - aTime
     })
 
     tasks.value = merged
   } catch (err) {
     console.error(err)
-    error.value = '讀取任務紀錄失敗，請檢查 Firestore 索引'
+    error.value = '讀取任務紀錄失敗'
   } finally {
     loading.value = false
   }
@@ -413,7 +389,7 @@ const completeTask = async (task) => {
       taskId: task.id,
       title: task.title || '',
       note: task.note || '',
-      type: task.type || 'key',
+      type: task.type || 'manual',
       startAt: task.startAt || null,
       endAt: task.endAt || null,
       dueAt: task.dueAt || task.startAt || null,
@@ -467,7 +443,7 @@ const deleteHistory = async (task) => {
 }
 
 const editTask = (id) => {
-  router.push(`/task/new?id=${id}`)
+  router.push(`/task-form?id=${id}`)
 }
 
 const goHome = () => {

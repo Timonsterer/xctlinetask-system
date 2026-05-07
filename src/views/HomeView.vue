@@ -12,9 +12,23 @@
         </button>
       </div>
 
-      <div v-if="currentTask" class="current-box">
-        <p class="task-label">現在要做</p>
-        <h2>{{ currentTask.content }}</h2>
+      <div v-if="loading" class="empty-box">
+        <h2>任務載入中...</h2>
+      </div>
+
+      <div v-else-if="currentTask" class="current-box">
+        <p class="task-label">
+          現在要做
+          <span v-if="currentTask.source === 'template' || currentTask.type === 'life_template'">
+            ・人物套版
+          </span>
+        </p>
+
+        <h2>{{ taskTitle(currentTask) }}</h2>
+
+        <p v-if="currentTask.note" class="task-note">
+          {{ currentTask.note }}
+        </p>
 
         <button class="main-btn" @click="goNextTask">
           完成，下一個任務
@@ -91,12 +105,34 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  updateDoc,
+  serverTimestamp,
+} from 'firebase/firestore'
+import { db } from '@/firebase'
 
 const router = useRouter()
+
+const loading = ref(false)
 const currentTask = ref(null)
+const taskList = ref([])
+
+function getUserId() {
+  return (
+    localStorage.getItem('lineUserId') ||
+    localStorage.getItem('userId') ||
+    localStorage.getItem('line_user_id') ||
+    ''
+  )
+}
 
 function checkLogin() {
-  const userId = localStorage.getItem('lineUserId')
+  const userId = getUserId()
 
   if (!userId) {
     router.replace('/bind')
@@ -106,23 +142,87 @@ function checkLogin() {
   return true
 }
 
+function taskTitle(task) {
+  return task?.content || task?.title || task?.name || '未命名任務'
+}
+
+function safeTime(value) {
+  if (!value) return 0
+  if (typeof value.toMillis === 'function') return value.toMillis()
+  if (value instanceof Date) return value.getTime()
+  return 0
+}
+
+async function loadTasks() {
+  const userId = getUserId()
+
+  if (!userId) {
+    router.replace('/bind')
+    return
+  }
+
+  loading.value = true
+
+  try {
+    const q = query(
+      collection(db, 'tasks'),
+      where('userId', '==', userId)
+    )
+
+    const snap = await getDocs(q)
+
+    const list = snap.docs
+      .map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }))
+      .filter((task) => task.status !== 'done' && task.status !== 'completed')
+      .sort((a, b) => {
+        const aTime = safeTime(a.startAt) || safeTime(a.createdAt)
+        const bTime = safeTime(b.startAt) || safeTime(b.createdAt)
+        return aTime - bTime
+      })
+
+    taskList.value = list
+    currentTask.value = list[0] || null
+  } catch (err) {
+    console.error('讀取任務失敗:', err)
+    alert('讀取任務失敗，請檢查 Firestore 權限')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function goNextTask() {
+  if (!currentTask.value?.id) return
+
+  try {
+    await updateDoc(doc(db, 'tasks', currentTask.value.id), {
+      status: 'done',
+      isCurrent: false,
+      completedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+
+    await loadTasks()
+  } catch (err) {
+    console.error('完成任務失敗:', err)
+    alert('完成任務失敗')
+  }
+}
+
 const goTaskForm = () => router.push('/task-form')
 const goTaskHistory = () => router.push('/task-history')
-const goIdleForm = () => router.push('/idle/new')
-const goIdleMarket = () => router.push('/idle/market')
+const goIdleForm = () => router.push('/idle-form')
+const goIdleMarket = () => router.push('/idle-market')
 const goContacts = () => router.push('/contacts')
 const goLifeTemplates = () => router.push('/life-templates')
 const goPocketPlaces = () => router.push('/pocket-places')
 const goRaid = () => router.push('/raid')
 
-const goNextTask = () => {
-  currentTask.value = null
-}
-
 onMounted(() => {
   if (!checkLogin()) return
-
-  currentTask.value = null
+  loadTasks()
 })
 </script>
 
@@ -196,6 +296,13 @@ h1 {
   margin: 0 0 16px;
   font-size: 26px;
   line-height: 1.35;
+}
+
+.task-note {
+  margin: -4px 0 18px;
+  color: #dbeafe;
+  line-height: 1.6;
+  font-size: 14px;
 }
 
 .empty-box p {
