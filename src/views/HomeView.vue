@@ -106,8 +106,8 @@ function checkLogin() {
   return true
 }
 
-const goTaskForm = () => router.push('/task/new')
-const goTaskHistory = () => router.push('/task/history')
+const goTaskForm = () => router.push('/task-form')
+const goTaskHistory = () => router.push('/task-history')
 const goIdleForm = () => router.push('/idle/new')
 const goIdleMarket = () => router.push('/idle/market')
 const goContacts = () => router.push('/contacts')
