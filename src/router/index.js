@@ -23,8 +23,11 @@ import LifeTemplateDetailView from '@/views/LifeTemplateDetailView.vue'
 // 多人副本
 import RaidView from '@/views/RaidView.vue'
 
-// ✅ 口袋名單（新增）
+// 口袋名單
 import PocketPlaceView from '@/views/PocketPlaceView.vue'
+
+// 管理者模式
+import AdminView from '@/views/AdminView.vue'
 
 const routes = [
   {
@@ -122,14 +125,20 @@ const routes = [
     props: true,
   },
 
-  // ✅ 口袋名單頁面（新增）
   {
     path: '/pocket-places',
     name: 'pocket-places',
     component: PocketPlaceView,
   },
 
-  // ⚠️ fallback 一定放最後
+  // 管理者模式
+  {
+    path: '/admin',
+    name: 'admin',
+    component: AdminView,
+  },
+
+  // fallback
   {
     path: '/:pathMatch(.*)*',
     redirect: '/home',
