@@ -11,9 +11,7 @@
     </header>
 
     <section class="card">
-
       <div class="form-grid">
-
         <input
           v-model="form.name"
           placeholder="姓名"
@@ -38,21 +36,17 @@
           v-model="form.note"
           placeholder="備註"
         ></textarea>
-
       </div>
 
       <div class="button-grid">
-
-        <!-- 儲存 -->
         <button
           class="btn blue"
           @click="saveContact"
           :disabled="saving"
         >
-          {{ isEdit ? '更新聯絡人' : '新增聯絡人' }}
+          {{ saving ? '儲存中...' : isEdit ? '更新聯絡人' : '新增聯絡人' }}
         </button>
 
-        <!-- 新增任務 -->
         <button
           class="btn purple"
           @click="addToTask"
@@ -60,16 +54,13 @@
           新增到任務
         </button>
 
-        <!-- Google Map -->
         <button
           class="btn green"
           @click="openGoogleMap"
         >
           Google Map 導航
         </button>
-
       </div>
-
     </section>
   </div>
 </template>
@@ -102,9 +93,13 @@ const router = useRouter()
 
 const saving = ref(false)
 
-const isEdit = computed(() => {
-  return !!route.params.id
-})
+const currentUserId =
+  localStorage.getItem('lineUserId') ||
+  localStorage.getItem('userId') ||
+  ''
+
+const contactId = computed(() => route.params.id || '')
+const isEdit = computed(() => !!contactId.value)
 
 const form = ref({
   name: '',
@@ -114,18 +109,37 @@ const form = ref({
   note: '',
 })
 
-const loadContact = async () => {
+function contactRef(id) {
+  return doc(
+    db,
+    'users',
+    currentUserId,
+    'contacts',
+    id
+  )
+}
 
-  if (!route.params.id) return
+function contactsCollectionRef() {
+  return collection(
+    db,
+    'users',
+    currentUserId,
+    'contacts'
+  )
+}
+
+async function loadContact() {
+  if (!isEdit.value) return
+
+  if (!currentUserId) {
+    alert('找不到使用者，請先登入')
+    router.push('/contacts')
+    return
+  }
 
   try {
-
     const snap = await getDoc(
-      doc(
-        db,
-        'contacts',
-        route.params.id
-      )
+      contactRef(contactId.value)
     )
 
     if (!snap.exists()) {
@@ -134,64 +148,55 @@ const loadContact = async () => {
       return
     }
 
+    const data = snap.data()
+
     form.value = {
-      name: snap.data().name || '',
-      phone: snap.data().phone || '',
-      company: snap.data().company || '',
-      address: snap.data().address || '',
-      note: snap.data().note || '',
+      name: data.name || '',
+      phone: data.phone || '',
+      company: data.company || '',
+      address: data.address || '',
+      note: data.note || '',
     }
-
   } catch (err) {
-
     console.error(err)
-
     alert('讀取聯絡人失敗')
   }
 }
 
-const saveContact = async () => {
+async function saveContact() {
+  if (!form.value.name.trim()) {
+    alert('請輸入姓名')
+    return
+  }
+
+  if (!currentUserId) {
+    alert('找不到使用者，請先登入')
+    return
+  }
+
+  saving.value = true
 
   try {
-
-    if (!form.value.name.trim()) {
-      alert('請輸入姓名')
-      return
-    }
-
-    saving.value = true
-
-    const lineUserId =
-      localStorage.getItem('lineUserId') ||
-      localStorage.getItem('userId') ||
-      ''
-
     const payload = {
-      ...form.value,
-
-      ownerId: lineUserId,
-
+      name: form.value.name || '',
+      phone: form.value.phone || '',
+      company: form.value.company || '',
+      address: form.value.address || '',
+      note: form.value.note || '',
+      ownerId: currentUserId,
       updatedAt: serverTimestamp(),
     }
 
     if (isEdit.value) {
-
       await updateDoc(
-        doc(
-          db,
-          'contacts',
-          route.params.id
-        ),
+        contactRef(contactId.value),
         payload
       )
-
     } else {
-
       await addDoc(
-        collection(db, 'contacts'),
+        contactsCollectionRef(),
         {
           ...payload,
-
           createdAt: serverTimestamp(),
         }
       )
@@ -204,9 +209,7 @@ const saveContact = async () => {
     )
 
     router.push('/contacts')
-
   } catch (err) {
-
     console.error(err)
 
     alert(
@@ -214,78 +217,49 @@ const saveContact = async () => {
         ? '更新失敗'
         : '新增失敗'
     )
-
   } finally {
-
     saving.value = false
   }
 }
 
-// 新增到任務
-const addToTask = async () => {
+async function addToTask() {
+  if (!form.value.name.trim()) {
+    alert('請先輸入聯絡人姓名')
+    return
+  }
+
+  if (!currentUserId) {
+    alert('尚未登入')
+    return
+  }
 
   try {
-
-    if (!form.value.name.trim()) {
-      alert('請先輸入聯絡人姓名')
-      return
-    }
-
-    const lineUserId =
-      localStorage.getItem('lineUserId') ||
-      localStorage.getItem('userId') ||
-      ''
-
-    if (!lineUserId) {
-      alert('尚未登入')
-      return
-    }
-
     await addDoc(
       collection(db, 'tasks'),
       {
         title: `聯絡：${form.value.name}`,
-
-        content:
-          form.value.note || '',
-
-        contactName:
-          form.value.name,
-
-        contactPhone:
-          form.value.phone || '',
-
-        contactCompany:
-          form.value.company || '',
-
-        contactAddress:
-          form.value.address || '',
-
+        content: form.value.note || '',
+        contactName: form.value.name,
+        contactPhone: form.value.phone || '',
+        contactCompany: form.value.company || '',
+        contactAddress: form.value.address || '',
         type: 'contact_followup',
-
         status: 'pending',
-
-        ownerId: lineUserId,
-        userId: lineUserId,
-
+        ownerId: currentUserId,
+        userId: currentUserId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }
     )
 
     alert('已新增到任務')
-
   } catch (err) {
-
     console.error(err)
-
     alert('新增任務失敗')
   }
 }
 
-// Google Map
-const openGoogleMap = () => {
-
+function openGoogleMap() {
   if (!form.value.address?.trim()) {
     alert('尚未填寫地址')
     return
@@ -381,7 +355,6 @@ textarea {
 }
 
 @media (max-width: 768px) {
-
   .button-grid {
     grid-template-columns: 1fr;
   }
