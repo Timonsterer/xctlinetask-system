@@ -1,12 +1,9 @@
-# src/views/ContactFormView.vue
-
-```vue
 <template>
   <div class="contact-page">
-
     <header class="header">
       <div>
         <p class="eyebrow">聯絡人管理</p>
+
         <h1>
           {{ isEdit ? '編輯聯絡人' : '新增聯絡人' }}
         </h1>
@@ -40,7 +37,7 @@
         <textarea
           v-model="form.note"
           placeholder="備註"
-        />
+        ></textarea>
 
       </div>
 
@@ -50,11 +47,12 @@
         <button
           class="btn blue"
           @click="saveContact"
+          :disabled="saving"
         >
           {{ isEdit ? '更新聯絡人' : '新增聯絡人' }}
         </button>
 
-        <!-- 一鍵新增任務 -->
+        <!-- 新增任務 -->
         <button
           class="btn purple"
           @click="addToTask"
@@ -73,7 +71,6 @@
       </div>
 
     </section>
-
   </div>
 </template>
 
@@ -103,7 +100,11 @@ import { db } from '@/firebase'
 const route = useRoute()
 const router = useRouter()
 
-const isEdit = computed(() => !!route.params.id)
+const saving = ref(false)
+
+const isEdit = computed(() => {
+  return !!route.params.id
+})
 
 const form = ref({
   name: '',
@@ -127,16 +128,25 @@ const loadContact = async () => {
       )
     )
 
-    if (!snap.exists()) return
+    if (!snap.exists()) {
+      alert('找不到聯絡人')
+      router.push('/contacts')
+      return
+    }
 
     form.value = {
-      ...form.value,
-      ...snap.data(),
+      name: snap.data().name || '',
+      phone: snap.data().phone || '',
+      company: snap.data().company || '',
+      address: snap.data().address || '',
+      note: snap.data().note || '',
     }
 
   } catch (err) {
 
     console.error(err)
+
+    alert('讀取聯絡人失敗')
   }
 }
 
@@ -149,9 +159,12 @@ const saveContact = async () => {
       return
     }
 
-    const lineUserId = localStorage.getItem(
-      'lineUserId'
-    )
+    saving.value = true
+
+    const lineUserId =
+      localStorage.getItem('lineUserId') ||
+      localStorage.getItem('userId') ||
+      ''
 
     const payload = {
       ...form.value,
@@ -178,12 +191,17 @@ const saveContact = async () => {
         collection(db, 'contacts'),
         {
           ...payload,
+
           createdAt: serverTimestamp(),
         }
       )
     }
 
-    alert('儲存成功')
+    alert(
+      isEdit.value
+        ? '更新成功'
+        : '新增成功'
+    )
 
     router.push('/contacts')
 
@@ -191,11 +209,19 @@ const saveContact = async () => {
 
     console.error(err)
 
-    alert('儲存失敗')
+    alert(
+      isEdit.value
+        ? '更新失敗'
+        : '新增失敗'
+    )
+
+  } finally {
+
+    saving.value = false
   }
 }
 
-// ⭐ 新增到任務
+// 新增到任務
 const addToTask = async () => {
 
   try {
@@ -205,9 +231,10 @@ const addToTask = async () => {
       return
     }
 
-    const lineUserId = localStorage.getItem(
-      'lineUserId'
-    )
+    const lineUserId =
+      localStorage.getItem('lineUserId') ||
+      localStorage.getItem('userId') ||
+      ''
 
     if (!lineUserId) {
       alert('尚未登入')
@@ -219,7 +246,7 @@ const addToTask = async () => {
       {
         title: `聯絡：${form.value.name}`,
 
-        description:
+        content:
           form.value.note || '',
 
         contactName:
@@ -256,7 +283,7 @@ const addToTask = async () => {
   }
 }
 
-// ⭐ Google Map 導航
+// Google Map
 const openGoogleMap = () => {
 
   if (!form.value.address?.trim()) {
@@ -337,6 +364,10 @@ textarea {
   cursor: pointer;
 }
 
+.btn:disabled {
+  opacity: 0.6;
+}
+
 .blue {
   background: #2563eb;
 }
@@ -356,4 +387,3 @@ textarea {
   }
 }
 </style>
-```
