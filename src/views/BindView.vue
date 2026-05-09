@@ -27,7 +27,7 @@ const error = ref('')
 // 第一次設定管理者：把你的 LINE userId 貼在這裡
 // 不知道 userId 的話，先登入一次後去 Firestore users 看文件 ID
 const ADMIN_LINE_USER_IDS = [
-  // 'Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+  'U75cb1bb6ea17f4dfc1ec76852c2b780e',
 ]
 
 function retryLogin() {
