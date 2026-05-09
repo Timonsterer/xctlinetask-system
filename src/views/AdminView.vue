@@ -27,6 +27,7 @@
 
       <!-- 統計 -->
       <section class="stats-grid">
+
         <div class="stat-card">
           <span>使用者數</span>
           <strong>{{ users.length }}</strong>
@@ -41,10 +42,94 @@
           <span>人物套版</span>
           <strong>{{ lifeTemplates.length }}</strong>
         </div>
+
+      </section>
+
+      <!-- 任務管理 -->
+      <section class="card">
+
+        <h2>任務管理</h2>
+
+        <div class="form-grid">
+
+          <input
+            v-model="taskSearch"
+            placeholder="搜尋任務名稱"
+          />
+
+          <input
+            v-model="userSearch"
+            placeholder="搜尋使用者ID / 名稱"
+          />
+
+        </div>
+
+        <div
+          v-if="filteredTasks.length === 0"
+          class="empty"
+        >
+          查無任務
+        </div>
+
+        <div v-else class="list">
+
+          <div
+            v-for="task in filteredTasks"
+            :key="task.id"
+            class="list-item"
+          >
+
+            <div class="left">
+
+              <strong>
+                {{ task.title || task.name || '未命名任務' }}
+              </strong>
+
+              <p>
+                {{ task.description || '無描述' }}
+              </p>
+
+              <small>
+                使用者：
+                {{
+                  task.ownerName ||
+                  task.displayName ||
+                  task.userName ||
+                  task.ownerId ||
+                  task.userId ||
+                  '未知'
+                }}
+              </small>
+
+              <br />
+
+              <small>
+                狀態：
+                {{ task.status || '未設定' }}
+              </small>
+
+            </div>
+
+            <div class="row-actions">
+
+              <button
+                class="small-btn danger"
+                @click="deleteTask(task.id)"
+              >
+                刪除任務
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
       </section>
 
       <!-- 人物套版新增 -->
       <section class="card">
+
         <h2>
           {{ editingTemplateId ? '編輯人物套版' : '新增人物套版' }}
         </h2>
@@ -79,6 +164,7 @@
         </div>
 
         <div class="actions">
+
           <button
             class="small-btn"
             @click="saveLifeTemplate"
@@ -93,11 +179,14 @@
           >
             取消編輯
           </button>
+
         </div>
+
       </section>
 
       <!-- 套版列表 -->
       <section class="card">
+
         <h2>人物套版管理</h2>
 
         <div
@@ -108,6 +197,7 @@
         </div>
 
         <div v-else class="list">
+
           <div
             v-for="item in lifeTemplates"
             :key="item.id"
@@ -115,6 +205,7 @@
           >
 
             <div class="left">
+
               <strong>
                 {{ item.title || item.name }}
               </strong>
@@ -132,16 +223,20 @@
                 v-if="item.tasks?.length"
                 class="task-preview"
               >
+
                 <div
                   v-for="task in item.tasks"
                   :key="task.id"
                 >
                   • {{ task.name || task.title || task.text }}
                 </div>
+
               </div>
+
             </div>
 
             <div class="row-actions">
+
               <button
                 class="small-btn"
                 @click="editLifeTemplate(item)"
@@ -155,14 +250,18 @@
               >
                 刪除
               </button>
+
             </div>
 
           </div>
+
         </div>
+
       </section>
 
       <!-- 使用者 -->
       <section class="card">
+
         <h2>使用者管理</h2>
 
         <div
@@ -173,12 +272,15 @@
         </div>
 
         <div v-else class="list">
+
           <div
             v-for="user in users"
             :key="user.id"
             class="list-item"
           >
+
             <div>
+
               <strong>
                 {{ user.displayName || '未命名使用者' }}
               </strong>
@@ -191,6 +293,7 @@
                 角色：
                 {{ user.role || 'user' }}
               </small>
+
             </div>
 
             <button
@@ -208,8 +311,11 @@
             >
               移除管理者
             </button>
+
           </div>
+
         </div>
+
       </section>
 
     </main>
@@ -217,7 +323,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import {
+  ref,
+  onMounted,
+  computed,
+} from 'vue'
+
 import { useRouter } from 'vue-router'
 
 import {
@@ -243,6 +354,9 @@ const users = ref([])
 const tasks = ref([])
 const lifeTemplates = ref([])
 
+const taskSearch = ref('')
+const userSearch = ref('')
+
 const editingTemplateId = ref(null)
 
 const templateForm = ref({
@@ -253,11 +367,47 @@ const templateForm = ref({
   tasksText: '',
 })
 
+const filteredTasks = computed(() => {
+
+  return tasks.value.filter((task) => {
+
+    const taskName = (
+      task.title ||
+      task.name ||
+      ''
+    ).toLowerCase()
+
+    const ownerText = (
+      task.ownerName ||
+      task.displayName ||
+      task.userName ||
+      task.ownerId ||
+      task.userId ||
+      ''
+    ).toLowerCase()
+
+    const matchTask =
+      !taskSearch.value ||
+      taskName.includes(
+        taskSearch.value.toLowerCase()
+      )
+
+    const matchUser =
+      !userSearch.value ||
+      ownerText.includes(
+        userSearch.value.toLowerCase()
+      )
+
+    return matchTask && matchUser
+  })
+})
+
 const goHome = () => {
   router.push('/home')
 }
 
 const checkAdmin = async () => {
+
   const lineUserId =
     localStorage.getItem('lineUserId')
 
@@ -266,7 +416,11 @@ const checkAdmin = async () => {
     return
   }
 
-  const userRef = doc(db, 'users', lineUserId)
+  const userRef = doc(
+    db,
+    'users',
+    lineUserId
+  )
 
   const userSnap = await getDoc(userRef)
 
@@ -280,6 +434,7 @@ const checkAdmin = async () => {
 }
 
 const loadUsers = async () => {
+
   const snap = await getDocs(
     collection(db, 'users')
   )
@@ -291,6 +446,7 @@ const loadUsers = async () => {
 }
 
 const loadTasks = async () => {
+
   const snap = await getDocs(
     collection(db, 'tasks')
   )
@@ -302,6 +458,7 @@ const loadTasks = async () => {
 }
 
 const loadLifeTemplates = async () => {
+
   const snap = await getDocs(
     collection(db, 'life_templates')
   )
@@ -313,6 +470,7 @@ const loadLifeTemplates = async () => {
 }
 
 const resetTemplateForm = () => {
+
   editingTemplateId.value = null
 
   templateForm.value = {
@@ -326,25 +484,22 @@ const resetTemplateForm = () => {
 
 const buildTemplatePayload = () => {
 
-  // ⭐ 完全兼容前台格式
   const tasks = templateForm.value.tasksText
     .split('\n')
     .map((text) => text.trim())
     .filter(Boolean)
     .map((text, index) => ({
       id: `task_${index + 1}`,
-
-      // ⭐ 全部都存
       name: text,
       title: text,
       text: text,
-
       done: false,
       order: index + 1,
     }))
 
   return {
     title: templateForm.value.title.trim(),
+
     name: templateForm.value.title.trim(),
 
     category:
@@ -356,7 +511,6 @@ const buildTemplatePayload = () => {
     description:
       templateForm.value.description.trim(),
 
-    // ⭐ 關鍵
     tasks,
 
     updatedAt: serverTimestamp(),
@@ -410,6 +564,7 @@ const editLifeTemplate = (item) => {
   editingTemplateId.value = item.id
 
   templateForm.value = {
+
     title:
       item.title || item.name || '',
 
@@ -458,6 +613,21 @@ const deleteLifeTemplate = async (id) => {
   if (editingTemplateId.value === id) {
     resetTemplateForm()
   }
+}
+
+const deleteTask = async (taskId) => {
+
+  const ok = confirm(
+    '確定刪除這個任務？'
+  )
+
+  if (!ok) return
+
+  await deleteDoc(
+    doc(db, 'tasks', taskId)
+  )
+
+  await loadTasks()
 }
 
 const setAdmin = async (userId) => {
@@ -607,6 +777,7 @@ textarea {
   background: #2563eb;
   color: white;
   font-weight: bold;
+  cursor: pointer;
 }
 
 .danger {
