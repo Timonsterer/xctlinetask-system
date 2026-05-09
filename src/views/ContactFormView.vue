@@ -1,186 +1,277 @@
-<template>
-  <div class="contact-form-page">
-    <header class="page-header">
-      <div>
-        <h1>{{ isEditMode ? '編輯聯絡人' : '新增聯絡人' }}</h1>
-        <p>建立客戶、朋友、合作對象資料。</p>
-      </div>
+# src/views/ContactFormView.vue
 
-      <button class="back-btn" @click="goBack">返回列表</button>
+```vue
+<template>
+  <div class="contact-page">
+
+    <header class="header">
+      <div>
+        <p class="eyebrow">聯絡人管理</p>
+        <h1>
+          {{ isEdit ? '編輯聯絡人' : '新增聯絡人' }}
+        </h1>
+      </div>
     </header>
 
-    <section class="form-card">
-      <p v-if="errorMessage" class="error-msg">{{ errorMessage }}</p>
-      <p v-if="successMessage" class="success-msg">{{ successMessage }}</p>
+    <section class="card">
 
-      <form @submit.prevent="submitForm" class="contact-form">
-        <label>
-          <span>姓名 *</span>
-          <input v-model.trim="form.name" type="text" placeholder="請輸入姓名" />
-        </label>
+      <div class="form-grid">
 
-        <label>
-          <span>電話</span>
-          <input v-model.trim="form.phone" type="text" placeholder="請輸入電話" />
-        </label>
+        <input
+          v-model="form.name"
+          placeholder="姓名"
+        />
 
-        <label>
-          <span>Email</span>
-          <input v-model.trim="form.email" type="email" placeholder="請輸入 Email" />
-        </label>
+        <input
+          v-model="form.phone"
+          placeholder="電話"
+        />
 
-        <label>
-          <span>公司</span>
-          <input v-model.trim="form.company" type="text" placeholder="請輸入公司名稱" />
-        </label>
+        <input
+          v-model="form.company"
+          placeholder="公司"
+        />
 
-        <label class="full-width">
-          <span>地址</span>
-          <input v-model.trim="form.address" type="text" placeholder="請輸入地址" />
-        </label>
+        <input
+          v-model="form.address"
+          placeholder="地址"
+        />
 
-        <label class="full-width">
-          <span>備註</span>
-          <textarea v-model.trim="form.note" rows="5" placeholder="請輸入備註"></textarea>
-        </label>
+        <textarea
+          v-model="form.note"
+          placeholder="備註"
+        />
 
-        <div class="action-row">
-          <button type="button" class="ghost-btn" @click="goBack">取消</button>
-          <button type="submit" class="save-btn" :disabled="saving">
-            {{ saving ? '儲存中...' : isEditMode ? '更新聯絡人' : '建立聯絡人' }}
-          </button>
-        </div>
-      </form>
+      </div>
+
+      <div class="button-grid">
+
+        <!-- 儲存 -->
+        <button
+          class="btn blue"
+          @click="saveContact"
+        >
+          {{ isEdit ? '更新聯絡人' : '新增聯絡人' }}
+        </button>
+
+        <!-- 一鍵新增任務 -->
+        <button
+          class="btn purple"
+          @click="addToTask"
+        >
+          新增到任務
+        </button>
+
+        <!-- Google Map -->
+        <button
+          class="btn green"
+          @click="openGoogleMap"
+        >
+          Google Map 導航
+        </button>
+
+      </div>
+
     </section>
+
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import {
-  addDoc,
+  ref,
+  computed,
+  onMounted,
+} from 'vue'
+
+import {
+  useRoute,
+  useRouter,
+} from 'vue-router'
+
+import {
   collection,
+  addDoc,
+  updateDoc,
   doc,
   getDoc,
   serverTimestamp,
-  updateDoc
 } from 'firebase/firestore'
-import { db } from '../firebase'
 
-const router = useRouter()
+import { db } from '@/firebase'
+
 const route = useRoute()
+const router = useRouter()
 
-const saving = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
-
-const currentUserId =
-  localStorage.getItem('lineUserId') ||
-  localStorage.getItem('userId') ||
-  ''
-
-const contactId = computed(() => route.params.id || '')
-const isEditMode = computed(() => !!contactId.value)
+const isEdit = computed(() => !!route.params.id)
 
 const form = ref({
   name: '',
   phone: '',
-  email: '',
   company: '',
   address: '',
-  note: ''
+  note: '',
 })
 
-function goBack() {
-  router.push('/contacts')
-}
+const loadContact = async () => {
 
-async function loadContact() {
-  if (!isEditMode.value) return
+  if (!route.params.id) return
 
   try {
-    const contactRef = doc(db, 'users', currentUserId, 'contacts', String(contactId.value))
-    const snap = await getDoc(contactRef)
 
-    if (!snap.exists()) {
-      errorMessage.value = '找不到聯絡人資料'
+    const snap = await getDoc(
+      doc(
+        db,
+        'contacts',
+        route.params.id
+      )
+    )
+
+    if (!snap.exists()) return
+
+    form.value = {
+      ...form.value,
+      ...snap.data(),
+    }
+
+  } catch (err) {
+
+    console.error(err)
+  }
+}
+
+const saveContact = async () => {
+
+  try {
+
+    if (!form.value.name.trim()) {
+      alert('請輸入姓名')
       return
     }
 
-    const data = snap.data()
+    const lineUserId = localStorage.getItem(
+      'lineUserId'
+    )
 
-    form.value = {
-      name: data.name || '',
-      phone: data.phone || '',
-      email: data.email || '',
-      company: data.company || '',
-      address: data.address || '',
-      note: data.note || ''
+    const payload = {
+      ...form.value,
+
+      ownerId: lineUserId,
+
+      updatedAt: serverTimestamp(),
     }
-  } catch (error) {
-    console.error('loadContact error:', error)
-    errorMessage.value = '讀取聯絡人失敗'
+
+    if (isEdit.value) {
+
+      await updateDoc(
+        doc(
+          db,
+          'contacts',
+          route.params.id
+        ),
+        payload
+      )
+
+    } else {
+
+      await addDoc(
+        collection(db, 'contacts'),
+        {
+          ...payload,
+          createdAt: serverTimestamp(),
+        }
+      )
+    }
+
+    alert('儲存成功')
+
+    router.push('/contacts')
+
+  } catch (err) {
+
+    console.error(err)
+
+    alert('儲存失敗')
   }
 }
 
-async function submitForm() {
-  errorMessage.value = ''
-  successMessage.value = ''
-
-  if (!currentUserId) {
-    errorMessage.value = '找不到使用者，請先登入'
-    return
-  }
-
-  if (!form.value.name.trim()) {
-    errorMessage.value = '請輸入姓名'
-    return
-  }
-
-  saving.value = true
+// ⭐ 新增到任務
+const addToTask = async () => {
 
   try {
-    const payload = {
-      name: form.value.name.trim(),
-      phone: form.value.phone.trim(),
-      email: form.value.email.trim(),
-      company: form.value.company.trim(),
-      address: form.value.address.trim(),
-      note: form.value.note.trim(),
-      updatedAt: serverTimestamp()
+
+    if (!form.value.name.trim()) {
+      alert('請先輸入聯絡人姓名')
+      return
     }
 
-    if (isEditMode.value) {
-      const contactRef = doc(db, 'users', currentUserId, 'contacts', String(contactId.value))
-      await updateDoc(contactRef, payload)
-      successMessage.value = '聯絡人已更新'
-    } else {
-      await addDoc(collection(db, 'users', currentUserId, 'contacts'), {
-        ...payload,
-        createdAt: serverTimestamp()
-      })
-      successMessage.value = '聯絡人已建立'
+    const lineUserId = localStorage.getItem(
+      'lineUserId'
+    )
 
-      form.value = {
-        name: '',
-        phone: '',
-        email: '',
-        company: '',
-        address: '',
-        note: ''
+    if (!lineUserId) {
+      alert('尚未登入')
+      return
+    }
+
+    await addDoc(
+      collection(db, 'tasks'),
+      {
+        title: `聯絡：${form.value.name}`,
+
+        description:
+          form.value.note || '',
+
+        contactName:
+          form.value.name,
+
+        contactPhone:
+          form.value.phone || '',
+
+        contactCompany:
+          form.value.company || '',
+
+        contactAddress:
+          form.value.address || '',
+
+        type: 'contact_followup',
+
+        status: 'pending',
+
+        ownerId: lineUserId,
+        userId: lineUserId,
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       }
-    }
+    )
 
-    setTimeout(() => {
-      router.push('/contacts')
-    }, 500)
-  } catch (error) {
-    console.error('submitForm error:', error)
-    errorMessage.value = isEditMode.value ? '更新失敗' : '建立失敗'
-  } finally {
-    saving.value = false
+    alert('已新增到任務')
+
+  } catch (err) {
+
+    console.error(err)
+
+    alert('新增任務失敗')
   }
+}
+
+// ⭐ Google Map 導航
+const openGoogleMap = () => {
+
+  if (!form.value.address?.trim()) {
+    alert('尚未填寫地址')
+    return
+  }
+
+  const query = encodeURIComponent(
+    form.value.address
+  )
+
+  window.open(
+    `https://www.google.com/maps/search/?api=1&query=${query}`,
+    '_blank'
+  )
 }
 
 onMounted(() => {
@@ -189,136 +280,80 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.contact-form-page {
-  max-width: 860px;
-  margin: 0 auto;
+.contact-page {
+  min-height: 100vh;
+  background: #f4f7fb;
   padding: 20px;
-  color: #1f2937;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+.header {
   margin-bottom: 20px;
 }
 
-.page-header h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
+.eyebrow {
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: bold;
 }
 
-.page-header p {
-  margin: 0;
-  color: #6b7280;
-}
-
-.back-btn,
-.save-btn,
-.ghost-btn {
-  border: none;
-  border-radius: 12px;
-  padding: 12px 14px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.back-btn,
-.save-btn {
-  background: #111827;
-  color: #fff;
-}
-
-.ghost-btn {
-  background: #e5e7eb;
-  color: #111827;
-}
-
-.back-btn:disabled,
-.save-btn:disabled,
-.ghost-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.form-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 20px;
+.card {
+  background: white;
+  border-radius: 24px;
   padding: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
 }
 
-.error-msg,
-.success-msg {
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  border-radius: 12px;
-}
-
-.error-msg {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.success-msg {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.contact-form {
+.form-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  gap: 14px;
 }
 
-.contact-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.contact-form span {
-  font-size: 14px;
-  color: #374151;
-}
-
-.contact-form input,
-.contact-form textarea {
+input,
+textarea {
   width: 100%;
   box-sizing: border-box;
-  padding: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  font-size: 14px;
-  font-family: inherit;
+  border: 1px solid #ddd;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
 }
 
-.contact-form textarea {
-  resize: vertical;
+textarea {
+  min-height: 120px;
 }
 
-.full-width {
-  grid-column: 1 / -1;
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 20px;
 }
 
-.action-row {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
+.btn {
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.blue {
+  background: #2563eb;
+}
+
+.green {
+  background: #059669;
+}
+
+.purple {
+  background: #7c3aed;
 }
 
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
 
-  .contact-form {
+  .button-grid {
     grid-template-columns: 1fr;
   }
 }
 </style>
+```
