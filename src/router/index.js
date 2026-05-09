@@ -26,123 +26,51 @@ import RaidView from '@/views/RaidView.vue'
 // 口袋名單
 import PocketPlaceView from '@/views/PocketPlaceView.vue'
 
+// 探店媒合
+import ExploreShopView from '@/views/ExploreShopView.vue'
+
+// 商家端
+import MerchantLoginView from '@/views/MerchantLoginView.vue'
+import MerchantCouponView from '@/views/MerchantCouponView.vue'
+
 // 管理者模式
 import AdminView from '@/views/AdminView.vue'
 
 const routes = [
-  {
-    path: '/',
-    redirect: '/home',
-  },
+  { path: '/', redirect: '/home' },
 
-  {
-    path: '/login',
-    name: 'login',
-    component: LoginView,
-    meta: { public: true },
-  },
+  { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
+  { path: '/bind', name: 'bind', component: BindView, meta: { public: true } },
+  { path: '/home', name: 'home', component: HomeView, meta: { public: true } },
 
-  {
-    path: '/bind',
-    name: 'bind',
-    component: BindView,
-    meta: { public: true },
-  },
+  { path: '/task-form', name: 'task-form', component: TaskFormView },
+  { path: '/task-history', name: 'task-history', component: TaskHistoryView },
 
-  {
-    path: '/home',
-    name: 'home',
-    component: HomeView,
-    meta: { public: true },
-  },
+  { path: '/idle-form', name: 'idle-form', component: IdleFormView },
+  { path: '/idle-market', name: 'idle-market', component: IdleMarketView },
 
-  {
-    path: '/task-form',
-    name: 'task-form',
-    component: TaskFormView,
-  },
+  { path: '/raid', name: 'raid', component: RaidView },
 
-  {
-    path: '/task-history',
-    name: 'task-history',
-    component: TaskHistoryView,
-  },
+  { path: '/contacts', name: 'contacts', component: ContactListView },
+  { path: '/contacts/new', name: 'contact-new', component: ContactFormView },
+  { path: '/contacts/:id', name: 'contact-detail', component: ContactDetailView, props: true },
+  { path: '/contacts/:id/edit', name: 'contact-edit', component: ContactFormView, props: true },
 
-  {
-    path: '/idle-form',
-    name: 'idle-form',
-    component: IdleFormView,
-  },
+  { path: '/life-templates', name: 'life-templates', component: LifeTemplateListView },
+  { path: '/life-templates/:id', name: 'life-template-detail', component: LifeTemplateDetailView, props: true },
 
-  {
-    path: '/idle-market',
-    name: 'idle-market',
-    component: IdleMarketView,
-  },
+  { path: '/pocket-places', name: 'pocket-places', component: PocketPlaceView },
 
-  {
-    path: '/raid',
-    name: 'raid',
-    component: RaidView,
-  },
+  // 探店媒合：客戶頁
+  { path: '/explore-shops', name: 'explore-shops', component: ExploreShopView },
 
-  {
-    path: '/contacts',
-    name: 'contacts',
-    component: ContactListView,
-  },
+  // 商家端：獨立網址，不從入口登入
+  { path: '/merchant/login', name: 'merchant-login', component: MerchantLoginView, meta: { public: true } },
+  { path: '/merchant/coupons', name: 'merchant-coupons', component: MerchantCouponView, meta: { public: true } },
 
-  {
-    path: '/contacts/new',
-    name: 'contact-new',
-    component: ContactFormView,
-  },
+  { path: '/admin', name: 'admin', component: AdminView },
 
-  {
-    path: '/contacts/:id',
-    name: 'contact-detail',
-    component: ContactDetailView,
-    props: true,
-  },
-
-  {
-    path: '/contacts/:id/edit',
-    name: 'contact-edit',
-    component: ContactFormView,
-    props: true,
-  },
-
-  {
-    path: '/life-templates',
-    name: 'life-templates',
-    component: LifeTemplateListView,
-  },
-
-  {
-    path: '/life-templates/:id',
-    name: 'life-template-detail',
-    component: LifeTemplateDetailView,
-    props: true,
-  },
-
-  {
-    path: '/pocket-places',
-    name: 'pocket-places',
-    component: PocketPlaceView,
-  },
-
-  // 管理者模式
-  {
-    path: '/admin',
-    name: 'admin',
-    component: AdminView,
-  },
-
-  // fallback
-  {
-    path: '/:pathMatch(.*)*',
-    redirect: '/home',
-  },
+  { path: '/:pathMatch(.*)*', redirect: '/home' },
 ]
 
 const router = createRouter({

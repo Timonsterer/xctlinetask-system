@@ -62,6 +62,12 @@
           <small>查看完成紀錄</small>
         </button>
 
+        <button class="menu-card gold" @click="goExploreShops">
+          <span class="emoji">🎟️</span>
+          <strong>探店媒合</strong>
+          <small>查看商家優惠與探店任務</small>
+        </button>
+
         <button class="menu-card green" @click="goPocketPlaces">
           <span class="emoji">📍</span>
           <strong>口袋名單</strong>
@@ -213,6 +219,7 @@ async function goNextTask() {
 
 const goTaskForm = () => router.push('/task-form')
 const goTaskHistory = () => router.push('/task-history')
+const goExploreShops = () => router.push('/explore-shops')
 const goIdleForm = () => router.push('/idle-form')
 const goIdleMarket = () => router.push('/idle-market')
 const goContacts = () => router.push('/contacts')
@@ -391,6 +398,10 @@ h1 {
 
 .purple {
   background: linear-gradient(135deg, #7c3aed, #5b21b6);
+}
+
+.gold {
+  background: linear-gradient(135deg, #f59e0b, #b45309);
 }
 
 .green {
