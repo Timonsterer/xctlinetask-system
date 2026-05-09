@@ -1,466 +1,649 @@
+# src/views/PocketPlaceView.vue
+
+```vue
 <template>
-  <div class="page">
+  <div class="pocket-page">
+
     <header class="header">
       <div>
-        <p class="tag">Pocket List</p>
-        <h1>口袋名單</h1>
-        <p class="sub">收藏、導航、分享你的私房名單</p>
+        <p class="eyebrow">口袋名單</p>
+        <h1>我的收藏地點</h1>
       </div>
+
+      <button class="add-btn" @click="openCreateModal">
+        新增地點
+      </button>
     </header>
 
-    <section class="card">
-      <h2>新增收藏</h2>
-
-      <input v-model="form.name" placeholder="地點名稱，例如：好吃牛肉麵" />
-      <input v-model="form.address" placeholder="地址或關鍵字，例如：台中市西區公益路" />
-
-      <select v-model="form.category">
-        <option value="餐廳">餐廳</option>
-        <option value="咖啡">咖啡</option>
-        <option value="客戶">客戶</option>
-        <option value="景點">景點</option>
-        <option value="其他">其他</option>
-      </select>
-
-      <textarea v-model="form.note" placeholder="備註，例如：牛肉很嫩、適合帶朋友"></textarea>
-
-      <button class="primary-btn" @click="addPlace">
-        加入口袋名單
-      </button>
+    <!-- 搜尋 -->
+    <section class="search-box">
+      <input
+        v-model="keyword"
+        placeholder="搜尋地點名稱"
+      />
     </section>
 
-    <section class="share-card">
-      <div>
-        <h2>分享我的公開名單</h2>
-        <p>勾選下方「分享給大家」，就會出現在分享清單裡。</p>
-      </div>
-
-      <button class="share-main-btn" @click="sharePublicList">
-        分享名單
-      </button>
+    <!-- 空 -->
+    <section
+      v-if="filteredPlaces.length === 0"
+      class="empty"
+    >
+      尚無口袋名單
     </section>
 
-    <section class="card">
-      <h2>搜尋收藏</h2>
-      <input v-model="keyword" placeholder="搜尋名稱、地址、分類、備註" />
-    </section>
+    <!-- 列表 -->
+    <section
+      v-else
+      class="place-list"
+    >
+      <div
+        v-for="place in filteredPlaces"
+        :key="place.id"
+        class="place-card"
+      >
 
-    <section class="list">
-      <div v-if="filteredPlaces.length === 0" class="empty">
-        尚無收藏地點
-      </div>
+        <img
+          v-if="place.imageUrl"
+          :src="place.imageUrl"
+          class="cover"
+        />
 
-      <div v-for="place in filteredPlaces" :key="place.id" class="place-card">
-        <div class="place-top">
-          <div>
-            <h3>{{ place.name }}</h3>
-            <span class="category">{{ place.category }}</span>
+        <div class="content">
+
+          <div class="top-row">
+            <div>
+              <h2>
+                {{ place.name }}
+              </h2>
+
+              <p class="address">
+                {{ place.address || '無地址' }}
+              </p>
+            </div>
           </div>
 
-          <label class="share-toggle">
-            <input
-              type="checkbox"
-              :checked="place.isPublic"
-              @change="togglePublic(place)"
-            />
-            <span>分享給大家</span>
-          </label>
-        </div>
+          <p class="description">
+            {{ place.description || '無介紹' }}
+          </p>
 
-        <p class="address">📍 {{ place.address }}</p>
-        <p v-if="place.note" class="note">備註：{{ place.note }}</p>
+          <div class="action-grid">
 
-        <div class="actions">
-          <button @click="openMap(place)">開啟地圖</button>
-          <button @click="openNavigation(place)">開始導航</button>
-          <button @click="sharePlace(place)">單筆分享</button>
-          <button class="delete" @click="deletePlace(place.id)">刪除</button>
+            <!-- Google Map -->
+            <button
+              class="action-btn"
+              @click="openMap(place)"
+            >
+              地圖導航
+            </button>
+
+            <!-- 新增任務 -->
+            <button
+              class="action-btn blue"
+              @click="addToTask(place)"
+            >
+              一鍵加入任務
+            </button>
+
+            <!-- 發起多人副本 -->
+            <button
+              class="action-btn purple"
+              @click="createRaid(place)"
+            >
+              發起多人副本
+            </button>
+
+            <!-- 分享 -->
+            <button
+              class="action-btn green"
+              @click="sharePlace(place)"
+            >
+              分享
+            </button>
+
+            <!-- 編輯 -->
+            <button
+              class="action-btn"
+              @click="editPlace(place)"
+            >
+              編輯
+            </button>
+
+            <!-- 刪除 -->
+            <button
+              class="action-btn red"
+              @click="deletePlace(place.id)"
+            >
+              刪除
+            </button>
+
+          </div>
         </div>
       </div>
     </section>
+
+    <!-- Modal -->
+    <div
+      v-if="showModal"
+      class="modal"
+    >
+      <div class="modal-card">
+
+        <h2>
+          {{ editingId ? '編輯地點' : '新增地點' }}
+        </h2>
+
+        <div class="form-grid">
+
+          <input
+            v-model="form.name"
+            placeholder="地點名稱"
+          />
+
+          <input
+            v-model="form.address"
+            placeholder="地址"
+          />
+
+          <input
+            v-model="form.imageUrl"
+            placeholder="圖片網址"
+          />
+
+          <textarea
+            v-model="form.description"
+            placeholder="介紹"
+          />
+
+        </div>
+
+        <div class="modal-actions">
+
+          <button
+            class="action-btn blue"
+            @click="savePlace"
+          >
+            {{ editingId ? '更新' : '新增' }}
+          </button>
+
+          <button
+            class="action-btn"
+            @click="closeModal"
+          >
+            取消
+          </button>
+
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import {
+  ref,
+  computed,
+  onMounted,
+} from 'vue'
+
 import {
   collection,
-  addDoc,
   getDocs,
-  deleteDoc,
+  addDoc,
   updateDoc,
+  deleteDoc,
   doc,
-  query,
-  where,
-  orderBy,
   serverTimestamp,
 } from 'firebase/firestore'
-import { db } from '@/firebase'
 
-const userId = localStorage.getItem('lineUserId') || ''
+import { db } from '@/firebase'
 
 const places = ref([])
 const keyword = ref('')
 
+const showModal = ref(false)
+const editingId = ref(null)
+
 const form = ref({
   name: '',
   address: '',
-  category: '餐廳',
-  note: '',
+  imageUrl: '',
+  description: '',
 })
 
-const placesRef = collection(db, 'pocket_places')
+const filteredPlaces = computed(() => {
+
+  return places.value.filter((place) => {
+
+    const text = `${
+      place.name || ''
+    } ${
+      place.address || ''
+    } ${
+      place.description || ''
+    }`.toLowerCase()
+
+    return text.includes(
+      keyword.value.toLowerCase()
+    )
+  })
+})
 
 const loadPlaces = async () => {
-  if (!userId) {
-    alert('尚未取得使用者資料，請先完成綁定')
-    return
-  }
 
-  const q = query(
-    placesRef,
-    where('ownerId', '==', userId),
-    orderBy('createdAt', 'desc')
+  const snap = await getDocs(
+    collection(db, 'pocket_places')
   )
-
-  const snap = await getDocs(q)
 
   places.value = snap.docs.map((docSnap) => ({
     id: docSnap.id,
-    isPublic: false,
     ...docSnap.data(),
   }))
 }
 
-const addPlace = async () => {
+const resetForm = () => {
+
+  editingId.value = null
+
+  form.value = {
+    name: '',
+    address: '',
+    imageUrl: '',
+    description: '',
+  }
+}
+
+const openCreateModal = () => {
+
+  resetForm()
+
+  showModal.value = true
+}
+
+const closeModal = () => {
+
+  showModal.value = false
+
+  resetForm()
+}
+
+const editPlace = (place) => {
+
+  editingId.value = place.id
+
+  form.value = {
+    name: place.name || '',
+    address: place.address || '',
+    imageUrl: place.imageUrl || '',
+    description: place.description || '',
+  }
+
+  showModal.value = true
+}
+
+const savePlace = async () => {
+
   if (!form.value.name.trim()) {
     alert('請輸入地點名稱')
     return
   }
 
-  if (!form.value.address.trim()) {
-    alert('請輸入地址或關鍵字')
-    return
-  }
-
-  await addDoc(placesRef, {
-    ownerId: userId,
-    name: form.value.name.trim(),
-    address: form.value.address.trim(),
-    category: form.value.category,
-    note: form.value.note.trim(),
-    isPublic: false,
-    createdAt: serverTimestamp(),
+  const payload = {
+    ...form.value,
     updatedAt: serverTimestamp(),
-  })
-
-  form.value = {
-    name: '',
-    address: '',
-    category: '餐廳',
-    note: '',
   }
+
+  if (editingId.value) {
+
+    await updateDoc(
+      doc(db, 'pocket_places', editingId.value),
+      payload
+    )
+
+  } else {
+
+    await addDoc(
+      collection(db, 'pocket_places'),
+      {
+        ...payload,
+        createdAt: serverTimestamp(),
+      }
+    )
+  }
+
+  closeModal()
 
   await loadPlaces()
 }
 
 const deletePlace = async (id) => {
-  if (!confirm('確定要刪除這個收藏嗎？')) return
 
-  await deleteDoc(doc(db, 'pocket_places', id))
+  const ok = confirm('確定刪除？')
+
+  if (!ok) return
+
+  await deleteDoc(
+    doc(db, 'pocket_places', id)
+  )
+
   await loadPlaces()
 }
 
-const togglePublic = async (place) => {
-  const nextValue = !place.isPublic
-
-  await updateDoc(doc(db, 'pocket_places', place.id), {
-    isPublic: nextValue,
-    updatedAt: serverTimestamp(),
-  })
-
-  place.isPublic = nextValue
-}
-
-const filteredPlaces = computed(() => {
-  const key = keyword.value.trim().toLowerCase()
-
-  if (!key) return places.value
-
-  return places.value.filter((place) => {
-    return (
-      place.name?.toLowerCase().includes(key) ||
-      place.address?.toLowerCase().includes(key) ||
-      place.category?.toLowerCase().includes(key) ||
-      place.note?.toLowerCase().includes(key)
-    )
-  })
-})
-
-const publicPlaces = computed(() => {
-  return places.value.filter((place) => place.isPublic)
-})
-
-const getSearchUrl = (place) => {
-  const queryText = `${place.name} ${place.address}`
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryText)}`
-}
-
-const getNavigationUrl = (place) => {
-  const destination = place.address || place.name
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`
-}
-
 const openMap = (place) => {
-  window.open(getSearchUrl(place), '_blank')
+
+  const query = encodeURIComponent(
+    place.address || place.name
+  )
+
+  window.open(
+    `https://www.google.com/maps/search/?api=1&query=${query}`,
+    '_blank'
+  )
 }
 
-const openNavigation = (place) => {
-  window.open(getNavigationUrl(place), '_blank')
+// ⭐ 一鍵新增到任務
+const addToTask = async (place) => {
+
+  try {
+
+    const lineUserId = localStorage.getItem(
+      'lineUserId'
+    )
+
+    if (!lineUserId) {
+      alert('尚未登入')
+      return
+    }
+
+    await addDoc(
+      collection(db, 'tasks'),
+      {
+        title: `前往：${place.name}`,
+
+        description:
+          place.description || '',
+
+        address:
+          place.address || '',
+
+        mapUrl:
+          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+            place.address || place.name
+          )}`,
+
+        type: 'pocket_place',
+
+        pocketPlaceId: place.id,
+
+        pocketPlaceName: place.name,
+
+        userId: lineUserId,
+        ownerId: lineUserId,
+
+        status: 'pending',
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }
+    )
+
+    alert('已新增到任務')
+
+  } catch (err) {
+
+    console.error(err)
+
+    alert('新增任務失敗')
+  }
+}
+
+// ⭐ 發起多人副本
+const createRaid = async (place) => {
+
+  try {
+
+    const lineUserId = localStorage.getItem(
+      'lineUserId'
+    )
+
+    if (!lineUserId) {
+      alert('尚未登入')
+      return
+    }
+
+    await addDoc(
+      collection(db, 'raids'),
+      {
+        title: `${place.name} 揪團`,
+
+        description:
+          place.description || '',
+
+        address:
+          place.address || '',
+
+        imageUrl:
+          place.imageUrl || '',
+
+        mapUrl:
+          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+            place.address || place.name
+          )}`,
+
+        ownerId: lineUserId,
+
+        pocketPlaceId: place.id,
+
+        status: 'recruiting',
+
+        maxMembers: 5,
+
+        members: [],
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }
+    )
+
+    alert('已建立多人副本')
+
+  } catch (err) {
+
+    console.error(err)
+
+    alert('建立多人副本失敗')
+  }
 }
 
 const sharePlace = async (place) => {
-  const shareText = `${place.name}\n${place.address}\n${getSearchUrl(place)}`
 
-  if (navigator.share) {
-    await navigator.share({
-      title: place.name,
-      text: shareText,
-      url: getSearchUrl(place),
-    })
-  } else {
-    await navigator.clipboard.writeText(shareText)
-    alert('分享連結已複製')
+  try {
+
+    const text = `${place.name}\n${place.address || ''}`
+
+    if (navigator.share) {
+
+      await navigator.share({
+        title: place.name,
+        text,
+      })
+
+    } else {
+
+      await navigator.clipboard.writeText(text)
+
+      alert('已複製分享內容')
+    }
+
+  } catch (err) {
+    console.error(err)
   }
 }
 
-const sharePublicList = async () => {
-  if (publicPlaces.value.length === 0) {
-    alert('請先勾選想分享的口袋名單')
-    return
-  }
-
-  const listText = publicPlaces.value
-    .map((place, index) => {
-      return `${index + 1}. ${place.name}
-${place.address}
-${getSearchUrl(place)}`
-    })
-    .join('\n\n')
-
-  const shareText = `我的口袋名單分享給你：\n\n${listText}`
-
-  if (navigator.share) {
-    await navigator.share({
-      title: '我的口袋名單',
-      text: shareText,
-    })
-  } else {
-    await navigator.clipboard.writeText(shareText)
-    alert('口袋名單已複製，可以貼到 LINE 分享')
-  }
-}
-
-onMounted(loadPlaces)
+onMounted(() => {
+  loadPlaces()
+})
 </script>
 
 <style scoped>
-.page {
+.pocket-page {
   min-height: 100vh;
+  background: #f4f7fb;
   padding: 20px;
-  background:
-    radial-gradient(circle at top left, #dbeafe 0, transparent 35%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-  box-sizing: border-box;
-}
-
-.header,
-.card,
-.share-card,
-.place-card {
-  max-width: 720px;
-  margin: 0 auto 16px;
 }
 
 .header {
-  padding: 18px 4px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.tag {
-  margin: 0 0 4px;
+.eyebrow {
   color: #2563eb;
   font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
+  font-weight: bold;
 }
 
-h1 {
-  margin: 0;
-  font-size: 34px;
-  font-weight: 900;
-  color: #111827;
+.search-box {
+  margin-bottom: 20px;
 }
 
-.sub {
-  margin: 6px 0 0;
-  color: #64748b;
-}
-
-.card,
-.share-card,
-.place-card {
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 22px;
-  padding: 18px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(10px);
-}
-
-.share-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  background: linear-gradient(135deg, #111827, #1e3a8a);
-  color: white;
-}
-
-h2 {
-  margin: 0 0 12px;
-  font-size: 20px;
-}
-
-.share-card h2 {
-  margin-bottom: 6px;
-}
-
-.share-card p {
-  margin: 0;
-  color: #dbeafe;
-  font-size: 14px;
-}
-
+.search-box input,
 input,
-select,
 textarea {
   width: 100%;
-  box-sizing: border-box;
-  padding: 13px;
-  margin-bottom: 10px;
-  border: 1px solid #e2e8f0;
+  padding: 12px;
   border-radius: 14px;
-  font-size: 16px;
-  background: #f8fafc;
+  border: 1px solid #ddd;
+  box-sizing: border-box;
 }
 
 textarea {
-  min-height: 84px;
-  resize: vertical;
+  min-height: 100px;
 }
 
-button {
+.place-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.place-card {
+  overflow: hidden;
+  border-radius: 24px;
+  background: white;
+}
+
+.cover {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+}
+
+.content {
+  padding: 20px;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.address {
+  color: #6b7280;
+}
+
+.description {
+  margin-top: 12px;
+  color: #374151;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.action-btn,
+.add-btn {
   border: none;
   border-radius: 14px;
-  padding: 11px 14px;
-  background: #2563eb;
+  padding: 12px;
   color: white;
-  font-size: 15px;
-  font-weight: 700;
+  font-weight: bold;
   cursor: pointer;
+  background: #374151;
 }
 
-button:hover {
-  opacity: 0.92;
+.blue {
+  background: #2563eb;
 }
 
-.primary-btn {
-  width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+.green {
+  background: #059669;
 }
 
-.share-main-btn {
-  white-space: nowrap;
-  background: white;
-  color: #1e3a8a;
-}
-
-.place-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.place-card h3 {
-  margin: 0 0 8px;
-  font-size: 22px;
-  color: #111827;
-}
-
-.category {
-  display: inline-block;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.address,
-.note {
-  margin: 12px 0 0;
-  color: #334155;
-  line-height: 1.5;
-}
-
-.share-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  font-size: 14px;
-  color: #475569;
-  font-weight: 700;
-}
-
-.share-toggle input {
-  width: auto;
-  margin: 0;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.delete {
+.red {
   background: #dc2626;
 }
 
-.empty {
-  max-width: 720px;
-  margin: 0 auto;
-  text-align: center;
-  color: #777;
-  padding: 30px 0;
+.purple {
+  background: #7c3aed;
 }
 
-@media (max-width: 520px) {
-  .share-card,
-  .place-top {
+.empty {
+  text-align: center;
+  color: #6b7280;
+  padding: 40px;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-card {
+  width: 92%;
+  max-width: 520px;
+  background: white;
+  border-radius: 24px;
+  padding: 24px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+@media (max-width: 768px) {
+
+  .action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
     flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
   }
 
-  .share-main-btn {
+  .add-btn {
     width: 100%;
-  }
-
-  .actions button {
-    flex: 1 1 45%;
   }
 }
 </style>
+```
