@@ -24,6 +24,12 @@ const router = useRouter()
 const loading = ref(true)
 const error = ref('')
 
+// 第一次設定管理者：把你的 LINE userId 貼在這裡
+// 不知道 userId 的話，先登入一次後去 Firestore users 看文件 ID
+const ADMIN_LINE_USER_IDS = [
+  // 'Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+]
+
 function retryLogin() {
   localStorage.removeItem('lineUserId')
   location.reload()
@@ -37,7 +43,7 @@ onMounted(async () => {
     const profile = await getLiffProfile()
 
     if (!profile) {
-      return
+      throw new Error('無法取得 LINE 個人資料')
     }
 
     const userId = profile.userId
@@ -51,16 +57,21 @@ onMounted(async () => {
     const userRef = doc(db, 'users', userId)
     const snap = await getDoc(userRef)
 
+    const isAdmin = ADMIN_LINE_USER_IDS.includes(userId)
+
     if (!snap.exists()) {
       await setDoc(userRef, {
         userId,
         lineUserId: userId,
         displayName: profile.displayName || '',
         pictureUrl: profile.pictureUrl || '',
+        role: isAdmin ? 'admin' : 'user',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
     } else {
+      const oldData = snap.data()
+
       await setDoc(
         userRef,
         {
@@ -68,6 +79,7 @@ onMounted(async () => {
           lineUserId: userId,
           displayName: profile.displayName || '',
           pictureUrl: profile.pictureUrl || '',
+          role: oldData.role || (isAdmin ? 'admin' : 'user'),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
