@@ -70,13 +70,13 @@
 
         <button class="menu-card orange" @click="goIdleForm">
           <span class="emoji">🙋</span>
-          <strong>我很閒</strong>
-          <small>發布可約狀態</small>
+          <strong>我是閒置村民</strong>
+          <small>發布自己為可邀約狀態</small>
         </button>
 
         <button class="menu-card teal" @click="goIdleMarket">
           <span class="emoji">🧑‍🤝‍🧑</span>
-          <strong>我很閒市場</strong>
+          <strong>閒置村民邀約</strong>
           <small>看看誰有空</small>
         </button>
 
