@@ -7,7 +7,7 @@ const axios = require('axios')
 
 admin.initializeApp()
 
-const LINE_TOKEN = "請貼回你原本的 LINE_TOKEN"
+const LINE_TOKEN = "aJdHrp9V8uX75wOOaTPriztvvAkoiqhNItewcdI/oPeQLfw02AVWgoRSx3HN8vcRqD0/jVbWIQ4+J6kaSXrqWu4viIn44060THxh5CRoxdsYshKERXv3RSAyycpcsHfnhiR5s3a64ZEJ1vs7L56z3QdB04t89/1O/w1cDnyilFU="
 const LIFF_URL = 'https://liff.line.me/2009690445-fzD5YF3K'
 
 const db = admin.firestore()
