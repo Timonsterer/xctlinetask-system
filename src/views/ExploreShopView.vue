@@ -1,35 +1,24 @@
 <template>
   <div class="explore-page">
     <section class="hero">
-      <div>
-        <p class="eyebrow">EXPLORE</p>
-        <h1>探店媒合</h1>
-        <p class="hero-text">
-          找附近優惠、收藏口袋名單、加入待做任務。
-        </p>
-      </div>
+      <p class="eyebrow">EXPLORE</p>
+      <h1>探店媒合</h1>
+      <p class="hero-text">找附近優惠、收藏口袋名單、加入待做任務。</p>
     </section>
 
     <section class="filter-card">
       <div class="filter-top">
         <h2>可去範圍</h2>
-
-        <button class="refresh-btn" @click="loadCoupons">
-          重新搜尋
-        </button>
+        <button class="refresh-btn" @click="loadExploreItems">重新搜尋</button>
       </div>
 
       <div class="area-input">
         <input
           v-model="areaInput"
-          type="text"
           placeholder="例如：高雄楠梓區"
           @keyup.enter="addArea"
         />
-
-        <button @click="addArea">
-          新增
-        </button>
+        <button @click="addArea">新增</button>
       </div>
 
       <div class="quick-areas">
@@ -49,10 +38,7 @@
           class="area-chip"
         >
           {{ area }}
-
-          <span @click="removeArea(area)">
-            ×
-          </span>
+          <span @click="removeArea(area)">×</span>
         </div>
       </div>
     </section>
@@ -60,82 +46,68 @@
     <section class="coupon-section">
       <div class="section-top">
         <h2>探店優惠</h2>
-
-        <span class="count">
-          {{ coupons.length }} 間店
-        </span>
+        <span class="count">{{ exploreItems.length }} 筆</span>
       </div>
 
-      <div v-if="loading" class="empty-box">
-        讀取中...
-      </div>
+      <div v-if="loading" class="empty-box">讀取中...</div>
 
-      <div
-        v-else-if="coupons.length === 0"
-        class="empty-box"
-      >
-        目前沒有符合條件的店家
+      <div v-else-if="exploreItems.length === 0" class="empty-box">
+        目前沒有符合條件的店家或優惠券
       </div>
 
       <div
-        v-for="coupon in coupons"
-        :key="coupon.id"
+        v-for="item in exploreItems"
+        :key="item.id"
         class="coupon-card"
       >
         <img
-          v-if="coupon.imageBase64"
-          :src="coupon.imageBase64"
+          v-if="item.imageBase64 || item.imageUrl"
+          :src="item.imageBase64 || item.imageUrl"
           class="coupon-image"
         />
 
         <div class="coupon-body">
           <div class="coupon-header">
             <div>
-              <h3>
-                {{ coupon.merchantName || '未命名商家' }}
-              </h3>
-
-              <p class="area">
-                {{ coupon.area || '未設定區域' }}
-              </p>
+              <h3>{{ item.merchantName || item.name || '未命名商家' }}</h3>
+              <p class="area">{{ item.area || item.category || '未設定區域' }}</p>
             </div>
 
             <div class="tag">
-              優惠券
+              {{ item.type === 'merchant' ? '商家' : '優惠券' }}
             </div>
           </div>
 
           <h4 class="title">
-            {{ coupon.title }}
+            {{ item.title || item.discountText || item.name }}
           </h4>
 
           <p class="desc">
-            {{ coupon.description }}
+            {{ item.description || item.discountText || '尚無說明' }}
           </p>
 
           <p class="address">
-            📍 {{ coupon.address || '未提供地址' }}
+            📍 {{ item.address || '未提供地址' }}
+          </p>
+
+          <p v-if="item.code" class="code">
+            優惠碼：{{ item.code }}
+          </p>
+
+          <p v-if="item.endDate" class="date">
+            有效期限：{{ item.endDate }}
           </p>
 
           <div class="actions">
-            <button
-              class="pocket-btn"
-              @click="addToPocket(coupon)"
-            >
+            <button class="pocket-btn" @click="addToPocket(item)">
               收藏
             </button>
 
-            <button
-              class="task-btn"
-              @click="addToTask(coupon)"
-            >
+            <button class="task-btn" @click="addToTask(item)">
               加入任務
             </button>
 
-            <button
-              class="map-btn"
-              @click="openMap(coupon)"
-            >
+            <button class="map-btn" @click="openMap(item)">
               Google Map
             </button>
           </div>
@@ -143,10 +115,7 @@
       </div>
     </section>
 
-    <div
-      v-if="toast"
-      class="toast"
-    >
+    <div v-if="toast" class="toast">
       {{ toast }}
     </div>
   </div>
@@ -154,18 +123,23 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+
+import {
+  collection,
+  getDocs,
+} from 'firebase/firestore'
+
+import { db } from '@/firebase'
+
 import {
   addCouponToPocketPlace,
   addCouponToTask,
-  getActiveCouponsByAreas,
 } from '@/services/exploreService'
 
 const loading = ref(false)
-const coupons = ref([])
+const exploreItems = ref([])
 const toast = ref('')
-
 const areaInput = ref('')
-
 const allowedAreas = ref([])
 
 const quickAreas = [
@@ -189,7 +163,7 @@ onMounted(async () => {
     allowedAreas.value = JSON.parse(savedAreas)
   }
 
-  await loadCoupons()
+  await loadExploreItems()
 })
 
 function saveAreas() {
@@ -201,7 +175,6 @@ function saveAreas() {
 
 function addArea() {
   const area = areaInput.value.trim()
-
   if (!area) return
 
   if (!allowedAreas.value.includes(area)) {
@@ -209,8 +182,8 @@ function addArea() {
   }
 
   areaInput.value = ''
-
   saveAreas()
+  loadExploreItems()
 }
 
 function quickAdd(area) {
@@ -219,76 +192,165 @@ function quickAdd(area) {
   }
 
   saveAreas()
+  loadExploreItems()
 }
 
 function removeArea(area) {
-  allowedAreas.value =
-    allowedAreas.value.filter((a) => a !== area)
+  allowedAreas.value = allowedAreas.value.filter((item) => item !== area)
 
   saveAreas()
+  loadExploreItems()
 }
 
-async function loadCoupons() {
+function passAreaFilter(item) {
+  if (allowedAreas.value.length === 0) return true
+
+  const text = [
+    item.area,
+    item.address,
+    item.category,
+    item.merchantName,
+    item.name,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return allowedAreas.value.some((area) => text.includes(area))
+}
+
+function passStatusFilter(item) {
+  return !item.status || item.status === 'active'
+}
+
+async function loadExploreItems() {
   loading.value = true
 
   try {
-    coupons.value =
-      await getActiveCouponsByAreas(
-        allowedAreas.value
-      )
+    const merchantSnap = await getDocs(collection(db, 'merchants'))
+    const couponSnap = await getDocs(collection(db, 'coupons'))
+
+    const merchants = merchantSnap.docs.map((docSnap) => ({
+      id: docSnap.id,
+      type: 'merchant',
+      ...docSnap.data(),
+    }))
+
+    const merchantMap = {}
+
+    merchants.forEach((merchant) => {
+      merchantMap[merchant.id] = merchant
+    })
+
+    const coupons = couponSnap.docs.map((docSnap) => {
+      const data = docSnap.data()
+      const merchant = merchantMap[data.merchantId] || {}
+
+      return {
+        id: docSnap.id,
+        type: 'coupon',
+
+        ...data,
+
+        merchantName:
+          data.merchantName ||
+          merchant.name ||
+          '未命名商家',
+
+        name:
+          merchant.name ||
+          data.merchantName ||
+          data.title,
+
+        category:
+          data.category ||
+          merchant.category ||
+          '',
+
+        area:
+          data.area ||
+          merchant.area ||
+          merchant.category ||
+          '',
+
+        address:
+          data.address ||
+          merchant.address ||
+          '',
+
+        googleMapUrl:
+          data.googleMapUrl ||
+          data.mapUrl ||
+          merchant.googleMapUrl ||
+          merchant.mapUrl ||
+          '',
+
+        imageUrl:
+          data.imageUrl ||
+          merchant.imageUrl ||
+          '',
+
+        imageBase64:
+          data.imageBase64 ||
+          merchant.imageBase64 ||
+          '',
+      }
+    })
+
+    const merchantOnlyItems = merchants.map((merchant) => ({
+      ...merchant,
+      merchantName: merchant.name || '未命名商家',
+      title: merchant.name || '未命名商家',
+      area: merchant.area || merchant.category || '',
+      googleMapUrl: merchant.googleMapUrl || merchant.mapUrl || '',
+    }))
+
+    const allItems = [
+      ...coupons,
+      ...merchantOnlyItems,
+    ]
+
+    exploreItems.value = allItems
+      .filter(passStatusFilter)
+      .filter(passAreaFilter)
   } catch (err) {
     console.error(err)
-
-    showToast('讀取優惠失敗')
+    showToast('讀取探店資料失敗')
   } finally {
     loading.value = false
   }
 }
 
-async function addToPocket(coupon) {
+async function addToPocket(item) {
   try {
-    await addCouponToPocketPlace(
-      userId,
-      coupon
-    )
-
+    await addCouponToPocketPlace(userId, item)
     showToast('已加入口袋名單')
   } catch (err) {
     console.error(err)
-
     showToast('加入失敗')
   }
 }
 
-async function addToTask(coupon) {
+async function addToTask(item) {
   try {
-    await addCouponToTask(
-      userId,
-      coupon
-    )
-
+    await addCouponToTask(userId, item)
     showToast('已加入待做任務')
   } catch (err) {
     console.error(err)
-
     showToast('加入任務失敗')
   }
 }
 
-function openMap(coupon) {
-  if (coupon.googleMapUrl) {
-    window.open(
-      coupon.googleMapUrl,
-      '_blank'
-    )
-
+function openMap(item) {
+  if (item.googleMapUrl || item.mapUrl) {
+    window.open(item.googleMapUrl || item.mapUrl, '_blank')
     return
   }
 
   const keyword = encodeURIComponent(
-    coupon.address ||
-      coupon.title ||
-      coupon.merchantName
+    item.address ||
+    item.merchantName ||
+    item.name ||
+    item.title
   )
 
   window.open(
@@ -326,11 +388,7 @@ function showToast(message) {
 .hero {
   padding: 28px;
   border-radius: 28px;
-  background: linear-gradient(
-    135deg,
-    #f59e0b,
-    #b45309
-  );
+  background: linear-gradient(135deg, #f59e0b, #b45309);
   color: white;
   box-shadow: 0 18px 40px rgba(180, 83, 9, 0.2);
 }
@@ -405,7 +463,8 @@ function showToast(message) {
   cursor: pointer;
 }
 
-.quick-areas {
+.quick-areas,
+.area-list {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -418,13 +477,6 @@ function showToast(message) {
   padding: 10px 14px;
   border-radius: 999px;
   cursor: pointer;
-}
-
-.area-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
 }
 
 .area-chip {
@@ -508,7 +560,9 @@ function showToast(message) {
   line-height: 1.7;
 }
 
-.address {
+.address,
+.code,
+.date {
   margin-top: 12px;
   color: #374151;
 }
@@ -556,23 +610,5 @@ function showToast(message) {
   border-radius: 999px;
   font-weight: 800;
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
-}
-
-@media (max-width: 640px) {
-  .area-input {
-    grid-template-columns: 1fr;
-  }
-
-  .coupon-header {
-    flex-direction: column;
-  }
-
-  .actions {
-    flex-direction: column;
-  }
-
-  .actions button {
-    width: 100%;
-  }
 }
 </style>
