@@ -2,8 +2,8 @@
   <div class="explore-page">
     <section class="hero">
       <p class="eyebrow">EXPLORE</p>
-      <h1>探店媒合</h1>
-      <p class="hero-text">找附近優惠、收藏口袋名單、加入待做任務。</p>
+      <h1>探店優惠</h1>
+      <p class="hero-text">只顯示優惠券，使用後自動收藏店家。</p>
     </section>
 
     <section class="filter-card">
@@ -45,14 +45,14 @@
 
     <section class="coupon-section">
       <div class="section-top">
-        <h2>探店優惠</h2>
-        <span class="count">{{ exploreItems.length }} 筆</span>
+        <h2>優惠券列表</h2>
+        <span class="count">{{ exploreItems.length }} 張</span>
       </div>
 
       <div v-if="loading" class="empty-box">讀取中...</div>
 
       <div v-else-if="exploreItems.length === 0" class="empty-box">
-        目前沒有符合條件的店家或優惠券
+        目前沒有符合條件的優惠券
       </div>
 
       <div
@@ -69,17 +69,15 @@
         <div class="coupon-body">
           <div class="coupon-header">
             <div>
-              <h3>{{ item.merchantName || item.name || '未命名商家' }}</h3>
+              <h3>{{ item.merchantName || '未命名商家' }}</h3>
               <p class="area">{{ item.area || item.category || '未設定區域' }}</p>
             </div>
 
-            <div class="tag">
-              {{ item.type === 'merchant' ? '商家' : '優惠券' }}
-            </div>
+            <div class="tag">優惠券</div>
           </div>
 
           <h4 class="title">
-            {{ item.title || item.discountText || item.name }}
+            {{ item.title || item.discountText || '未命名優惠券' }}
           </h4>
 
           <p class="desc">
@@ -99,8 +97,8 @@
           </p>
 
           <div class="actions">
-            <button class="pocket-btn" @click="addToPocket(item)">
-              收藏
+            <button class="use-btn" @click="useCoupon(item)">
+              使用優惠券
             </button>
 
             <button class="task-btn" @click="addToTask(item)">
@@ -127,6 +125,11 @@ import { onMounted, ref } from 'vue'
 import {
   collection,
   getDocs,
+  doc,
+  updateDoc,
+  increment,
+  addDoc,
+  serverTimestamp,
 } from 'firebase/firestore'
 
 import { db } from '@/firebase'
@@ -197,7 +200,6 @@ function quickAdd(area) {
 
 function removeArea(area) {
   allowedAreas.value = allowedAreas.value.filter((item) => item !== area)
-
   saveAreas()
   loadExploreItems()
 }
@@ -210,7 +212,6 @@ function passAreaFilter(item) {
     item.address,
     item.category,
     item.merchantName,
-    item.name,
   ]
     .filter(Boolean)
     .join(' ')
@@ -222,6 +223,18 @@ function passStatusFilter(item) {
   return !item.status || item.status === 'active'
 }
 
+function passDateFilter(item) {
+  if (!item.endDate) return true
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const end = new Date(item.endDate)
+  end.setHours(23, 59, 59, 999)
+
+  return end >= today
+}
+
 async function loadExploreItems() {
   loading.value = true
 
@@ -229,16 +242,13 @@ async function loadExploreItems() {
     const merchantSnap = await getDocs(collection(db, 'merchants'))
     const couponSnap = await getDocs(collection(db, 'coupons'))
 
-    const merchants = merchantSnap.docs.map((docSnap) => ({
-      id: docSnap.id,
-      type: 'merchant',
-      ...docSnap.data(),
-    }))
-
     const merchantMap = {}
 
-    merchants.forEach((merchant) => {
-      merchantMap[merchant.id] = merchant
+    merchantSnap.docs.forEach((docSnap) => {
+      merchantMap[docSnap.id] = {
+        id: docSnap.id,
+        ...docSnap.data(),
+      }
     })
 
     const coupons = couponSnap.docs.map((docSnap) => {
@@ -251,15 +261,11 @@ async function loadExploreItems() {
 
         ...data,
 
+        merchantId: data.merchantId || '',
         merchantName:
           data.merchantName ||
           merchant.name ||
           '未命名商家',
-
-        name:
-          merchant.name ||
-          data.merchantName ||
-          data.title,
 
         category:
           data.category ||
@@ -293,40 +299,60 @@ async function loadExploreItems() {
           data.imageBase64 ||
           merchant.imageBase64 ||
           '',
+
+        merchantData: merchant,
       }
     })
 
-    const merchantOnlyItems = merchants.map((merchant) => ({
-      ...merchant,
-      merchantName: merchant.name || '未命名商家',
-      title: merchant.name || '未命名商家',
-      area: merchant.area || merchant.category || '',
-      googleMapUrl: merchant.googleMapUrl || merchant.mapUrl || '',
-    }))
-
-    const allItems = [
-      ...coupons,
-      ...merchantOnlyItems,
-    ]
-
-    exploreItems.value = allItems
+    exploreItems.value = coupons
       .filter(passStatusFilter)
+      .filter(passDateFilter)
       .filter(passAreaFilter)
   } catch (err) {
     console.error(err)
-    showToast('讀取探店資料失敗')
+    showToast('讀取優惠券失敗')
   } finally {
     loading.value = false
   }
 }
 
-async function addToPocket(item) {
+async function useCoupon(item) {
   try {
-    await addCouponToPocketPlace(userId, item)
-    showToast('已加入口袋名單')
+    await addCouponToPocketPlace(userId, {
+      id: item.merchantId || item.id,
+      merchantId: item.merchantId || '',
+      name: item.merchantName || item.name || item.title,
+      merchantName: item.merchantName || item.name || item.title,
+      category: item.category || '',
+      area: item.area || '',
+      address: item.address || '',
+      googleMapUrl: item.googleMapUrl || item.mapUrl || '',
+      mapUrl: item.googleMapUrl || item.mapUrl || '',
+      imageUrl: item.imageUrl || '',
+      imageBase64: item.imageBase64 || '',
+      source: 'coupon_used',
+      couponId: item.id,
+      couponTitle: item.title || '',
+    })
+
+    await addDoc(collection(db, 'coupon_usages'), {
+      userId,
+      couponId: item.id,
+      merchantId: item.merchantId || '',
+      merchantName: item.merchantName || '',
+      title: item.title || '',
+      usedAt: serverTimestamp(),
+    })
+
+    await updateDoc(doc(db, 'coupons', item.id), {
+      usedCount: increment(1),
+      lastUsedAt: serverTimestamp(),
+    })
+
+    showToast('已使用優惠券，店家已自動收藏到口袋名單')
   } catch (err) {
     console.error(err)
-    showToast('加入失敗')
+    showToast('使用失敗，請檢查 Firestore 權限')
   }
 }
 
@@ -349,7 +375,6 @@ function openMap(item) {
   const keyword = encodeURIComponent(
     item.address ||
     item.merchantName ||
-    item.name ||
     item.title
   )
 
@@ -584,9 +609,9 @@ function showToast(message) {
   cursor: pointer;
 }
 
-.pocket-btn {
-  background: #dbeafe;
-  color: #1d4ed8;
+.use-btn {
+  background: #f59e0b;
+  color: white;
 }
 
 .task-btn {
