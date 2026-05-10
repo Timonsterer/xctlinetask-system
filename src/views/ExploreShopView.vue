@@ -96,8 +96,12 @@
             有效期限：{{ item.endDate }}
           </p>
 
+          <p v-if="Number(item.limit || 0) > 0" class="remain">
+            剩餘數量：{{ getRemainingCount(item) }}
+          </p>
+
           <div class="actions">
-            <button class="use-btn" @click="useCoupon(item)">
+            <button class="use-btn" @click="handleUseCoupon(item)">
               使用優惠券
             </button>
 
@@ -125,18 +129,13 @@ import { onMounted, ref } from 'vue'
 import {
   collection,
   getDocs,
-  doc,
-  updateDoc,
-  increment,
-  addDoc,
-  serverTimestamp,
 } from 'firebase/firestore'
 
 import { db } from '@/firebase'
 
 import {
-  addCouponToPocketPlace,
   addCouponToTask,
+  useCoupon as useCouponService,
 } from '@/services/exploreService'
 
 const loading = ref(false)
@@ -204,6 +203,15 @@ function removeArea(area) {
   loadExploreItems()
 }
 
+function getRemainingCount(item) {
+  const limit = Number(item.limit || 0)
+  const usedCount = Number(item.usedCount || 0)
+
+  if (limit === 0) return '不限量'
+
+  return Math.max(limit - usedCount, 0)
+}
+
 function passAreaFilter(item) {
   if (allowedAreas.value.length === 0) return true
 
@@ -220,7 +228,17 @@ function passAreaFilter(item) {
 }
 
 function passStatusFilter(item) {
-  return !item.status || item.status === 'active'
+  const statusOk =
+    !item.status ||
+    item.status === 'active'
+
+  const isActiveOk =
+    item.isActive !== false
+
+  const notSoldOut =
+    item.soldOut !== true
+
+  return statusOk && isActiveOk && notSoldOut
 }
 
 function passDateFilter(item) {
@@ -233,6 +251,15 @@ function passDateFilter(item) {
   end.setHours(23, 59, 59, 999)
 
   return end >= today
+}
+
+function passLimitFilter(item) {
+  const limit = Number(item.limit || 0)
+  const usedCount = Number(item.usedCount || 0)
+
+  if (limit === 0) return true
+
+  return usedCount < limit
 }
 
 async function loadExploreItems() {
@@ -299,14 +326,13 @@ async function loadExploreItems() {
           data.imageBase64 ||
           merchant.imageBase64 ||
           '',
-
-        merchantData: merchant,
       }
     })
 
     exploreItems.value = coupons
       .filter(passStatusFilter)
       .filter(passDateFilter)
+      .filter(passLimitFilter)
       .filter(passAreaFilter)
   } catch (err) {
     console.error(err)
@@ -316,43 +342,16 @@ async function loadExploreItems() {
   }
 }
 
-async function useCoupon(item) {
+async function handleUseCoupon(item) {
   try {
-    await addCouponToPocketPlace(userId, {
-      id: item.merchantId || item.id,
-      merchantId: item.merchantId || '',
-      name: item.merchantName || item.name || item.title,
-      merchantName: item.merchantName || item.name || item.title,
-      category: item.category || '',
-      area: item.area || '',
-      address: item.address || '',
-      googleMapUrl: item.googleMapUrl || item.mapUrl || '',
-      mapUrl: item.googleMapUrl || item.mapUrl || '',
-      imageUrl: item.imageUrl || '',
-      imageBase64: item.imageBase64 || '',
-      source: 'coupon_used',
-      couponId: item.id,
-      couponTitle: item.title || '',
-    })
+    await useCouponService(userId, item)
 
-    await addDoc(collection(db, 'coupon_usages'), {
-      userId,
-      couponId: item.id,
-      merchantId: item.merchantId || '',
-      merchantName: item.merchantName || '',
-      title: item.title || '',
-      usedAt: serverTimestamp(),
-    })
+    showToast('已使用優惠券，店家已自動收藏')
 
-    await updateDoc(doc(db, 'coupons', item.id), {
-      usedCount: increment(1),
-      lastUsedAt: serverTimestamp(),
-    })
-
-    showToast('已使用優惠券，店家已自動收藏到口袋名單')
+    await loadExploreItems()
   } catch (err) {
     console.error(err)
-    showToast('使用失敗，請檢查 Firestore 權限')
+    showToast(err.message || '使用優惠券失敗')
   }
 }
 
@@ -587,9 +586,15 @@ function showToast(message) {
 
 .address,
 .code,
-.date {
+.date,
+.remain {
   margin-top: 12px;
   color: #374151;
+}
+
+.remain {
+  font-weight: 800;
+  color: #b45309;
 }
 
 .actions {

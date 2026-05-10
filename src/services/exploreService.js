@@ -5,11 +5,17 @@ import {
   query,
   where,
   serverTimestamp,
+  doc,
+  updateDoc,
+  increment,
+  getDoc,
 } from 'firebase/firestore'
 
 import { db } from '@/firebase'
 
-export async function getActiveCouponsByAreas(areas = []) {
+export async function getActiveCouponsByAreas(
+  areas = []
+) {
   const q = query(
     collection(db, 'coupons'),
     where('isActive', '==', true)
@@ -17,20 +23,40 @@ export async function getActiveCouponsByAreas(areas = []) {
 
   const snap = await getDocs(q)
 
-  let list = snap.docs.map((d) => ({
-    id: d.id,
-    ...d.data(),
-  }))
+  let list = snap.docs
+    .map((d) => ({
+      id: d.id,
+      ...d.data(),
+    }))
 
+    // 🔥 過濾已用完優惠券
+    .filter((item) => {
+      const limit =
+        Number(item.limit || 0)
+
+      const used =
+        Number(item.usedCount || 0)
+
+      // limit = 0 代表不限量
+      if (limit === 0) return true
+
+      return used < limit
+    })
+
+  // 區域過濾
   if (areas.length > 0) {
     list = list.filter((item) => {
       return areas.includes(item.area)
     })
   }
 
+  // 時間排序
   list.sort((a, b) => {
-    const aTime = a.createdAt?.seconds || 0
-    const bTime = b.createdAt?.seconds || 0
+    const aTime =
+      a.createdAt?.seconds || 0
+
+    const bTime =
+      b.createdAt?.seconds || 0
 
     return bTime - aTime
   })
@@ -99,7 +125,9 @@ export async function addCouponToTask(
   coupon
 ) {
   const now = new Date()
-  const startAt = now.toISOString().slice(0, 16)
+
+  const startAt =
+    now.toISOString().slice(0, 16)
 
   await addDoc(
     collection(db, 'tasks'),
@@ -139,4 +167,80 @@ export async function addCouponToTask(
         serverTimestamp(),
     }
   )
+}
+
+/**
+ * 使用優惠券
+ * 1. 扣數量
+ * 2. 自動收藏店家
+ * 3. 數量歸零自動隱藏
+ */
+export async function useCoupon(
+  userId,
+  coupon
+) {
+  const couponRef = doc(
+    db,
+    'coupons',
+    coupon.id
+  )
+
+  const couponSnap =
+    await getDoc(couponRef)
+
+  if (!couponSnap.exists()) {
+    throw new Error('優惠券不存在')
+  }
+
+  const data = couponSnap.data()
+
+  const limit =
+    Number(data.limit || 0)
+
+  const used =
+    Number(data.usedCount || 0)
+
+  // 已售完
+  if (
+    limit > 0 &&
+    used >= limit
+  ) {
+    throw new Error('優惠券已用完')
+  }
+
+  // 扣使用數
+  await updateDoc(couponRef, {
+    usedCount: increment(1),
+    updatedAt: serverTimestamp(),
+  })
+
+  // 收藏店家
+  await addCouponToPocketPlace(
+    userId,
+    coupon
+  )
+
+  // 再讀一次確認是否售完
+  const afterSnap =
+    await getDoc(couponRef)
+
+  const afterData =
+    afterSnap.data()
+
+  const afterUsed =
+    Number(afterData.usedCount || 0)
+
+  // 🔥 歸零自動隱藏
+  if (
+    limit > 0 &&
+    afterUsed >= limit
+  ) {
+    await updateDoc(couponRef, {
+      isActive: false,
+      soldOut: true,
+      soldOutAt: serverTimestamp(),
+    })
+  }
+
+  return true
 }
