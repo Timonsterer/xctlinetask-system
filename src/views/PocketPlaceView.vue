@@ -12,43 +12,24 @@
     </header>
 
     <section class="search-box">
-      <input
-        v-model="keyword"
-        placeholder="搜尋地點名稱"
-      />
+      <input v-model="keyword" placeholder="搜尋地點名稱" />
     </section>
 
-    <section
-      v-if="filteredPlaces.length === 0"
-      class="empty"
-    >
+    <section v-if="filteredPlaces.length === 0" class="empty">
       尚無口袋名單
     </section>
 
-    <section
-      v-else
-      class="place-list"
-    >
+    <section v-else class="place-list">
       <div
         v-for="place in filteredPlaces"
         :key="place.id"
         class="place-card"
       >
-        <img
-          v-if="place.imageUrl"
-          :src="place.imageUrl"
-          class="cover"
-        />
+        <img v-if="place.imageUrl" :src="place.imageUrl" class="cover" />
 
         <div class="content">
-          <div class="top-row">
-            <div>
-              <h2>{{ place.name }}</h2>
-              <p class="address">
-                {{ place.address || '無地址' }}
-              </p>
-            </div>
-          </div>
+          <h2>{{ place.name }}</h2>
+          <p class="address">{{ place.address || '無地址' }}</p>
 
           <p class="description">
             {{ place.description || place.note || '無介紹' }}
@@ -171,7 +152,6 @@ const uniquePlaces = computed(() => {
 
   sorted.forEach((place) => {
     const key = makePlaceKey(place)
-
     if (!key.trim()) return
 
     if (!map.has(key)) {
@@ -205,12 +185,11 @@ const loadPlaces = async () => {
   }))
 
   places.value = list.filter((place) => {
-    if (!lineUserId) return true
+    if (!lineUserId) return false
 
     return (
       place.ownerId === lineUserId ||
-      place.userId === lineUserId ||
-      (!place.ownerId && !place.userId)
+      place.userId === lineUserId
     )
   })
 }
@@ -255,6 +234,11 @@ const savePlace = async () => {
     return
   }
 
+  if (!lineUserId) {
+    alert('尚未登入')
+    return
+  }
+
   const newKey = makePlaceKey(form.value)
 
   const duplicated = uniquePlaces.value.find((place) => {
@@ -275,8 +259,13 @@ const savePlace = async () => {
     address: form.value.address.trim(),
     imageUrl: form.value.imageUrl.trim(),
     description: form.value.description.trim(),
+
     ownerId: lineUserId,
     userId: lineUserId,
+
+    isShared: false,
+    visibility: 'private',
+
     updatedAt: serverTimestamp(),
   }
 
@@ -359,7 +348,7 @@ const createRaid = async (place) => {
       return
     }
 
-    await addDoc(collection(db, 'raids'), {
+    await addDoc(collection(db, 'multi_raids'), {
       title: `${place.name} 揪團`,
       description: place.description || place.note || '',
       address: place.address || '',
@@ -373,8 +362,8 @@ const createRaid = async (place) => {
       ownerId: lineUserId,
       pocketPlaceId: place.id,
       status: 'recruiting',
-      maxMembers: 5,
-      members: [],
+      requiredPeople: 5,
+      joinedUsers: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
@@ -388,7 +377,10 @@ const createRaid = async (place) => {
 
 const sharePlace = async (place) => {
   try {
-    const text = `${place.name}\n${place.address || ''}`
+    const text =
+      `${place.name}\n` +
+      `${place.address || ''}\n` +
+      `${place.googleMapUrl || place.mapUrl || ''}`
 
     if (navigator.share) {
       await navigator.share({
@@ -399,6 +391,14 @@ const sharePlace = async (place) => {
       await navigator.clipboard.writeText(text)
       alert('已複製分享內容')
     }
+
+    await updateDoc(
+      doc(db, 'pocket_places', place.id),
+      {
+        isShared: true,
+        sharedAt: serverTimestamp(),
+      }
+    )
   } catch (err) {
     console.error(err)
   }
@@ -467,12 +467,6 @@ textarea {
 
 .content {
   padding: 20px;
-}
-
-.top-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 .address {
