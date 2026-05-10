@@ -4,12 +4,13 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   serverTimestamp,
   doc,
   updateDoc,
   deleteDoc,
+  getDoc,
 } from 'firebase/firestore'
+
 import { db } from '@/firebase'
 
 const MERCHANT_KEY = 'currentMerchantId'
@@ -22,21 +23,37 @@ export function logoutMerchant() {
   localStorage.removeItem(MERCHANT_KEY)
 }
 
-export async function loginMerchant({ phone, loginCode }) {
+export async function loginMerchant({
+  phone,
+  loginCode,
+}) {
+
   const q = query(
     collection(db, 'merchants'),
+
     where('phone', '==', phone),
-    where('loginCode', '==', loginCode)
+
+    where(
+      'loginCode',
+      '==',
+      loginCode
+    )
   )
 
   const snap = await getDocs(q)
 
   if (snap.empty) {
-    throw new Error('商家登入失敗，請確認手機與登入碼')
+    throw new Error(
+      '商家登入失敗，請確認手機與登入碼'
+    )
   }
 
   const merchantDoc = snap.docs[0]
-  localStorage.setItem(MERCHANT_KEY, merchantDoc.id)
+
+  localStorage.setItem(
+    MERCHANT_KEY,
+    merchantDoc.id
+  )
 
   return {
     id: merchantDoc.id,
@@ -44,30 +61,53 @@ export async function loginMerchant({ phone, loginCode }) {
   }
 }
 
-export async function createMerchant({ name, phone, loginCode, area, address, googleMapUrl }) {
-  const docRef = await addDoc(collection(db, 'merchants'), {
-    name,
-    phone,
-    loginCode,
-    area,
-    address,
-    googleMapUrl,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
+export async function createMerchant({
+  name,
+  phone,
+  loginCode,
+  area,
+  address,
+  googleMapUrl,
+}) {
+
+  const docRef = await addDoc(
+    collection(db, 'merchants'),
+    {
+      name,
+      phone,
+      loginCode,
+      area,
+      address,
+      googleMapUrl,
+
+      createdAt:
+        serverTimestamp(),
+
+      updatedAt:
+        serverTimestamp(),
+    }
+  )
 
   return docRef.id
 }
 
-export async function getMerchantById(merchantId) {
-  const q = query(collection(db, 'merchants'), where('__name__', '==', merchantId))
-  const snap = await getDocs(q)
+export async function getMerchantById(
+  merchantId
+) {
 
-  if (snap.empty) return null
+  if (!merchantId) return null
+
+  const snap = await getDoc(
+    doc(db, 'merchants', merchantId)
+  )
+
+  if (!snap.exists()) {
+    return null
+  }
 
   return {
-    id: snap.docs[0].id,
-    ...snap.docs[0].data(),
+    id: snap.id,
+    ...snap.data(),
   }
 }
 
@@ -81,45 +121,96 @@ export async function createCoupon({
   googleMapUrl,
   imageBase64,
 }) {
-  const docRef = await addDoc(collection(db, 'coupons'), {
-    merchantId,
-    merchantName,
-    title,
-    description,
-    area,
-    address,
-    googleMapUrl,
-    imageBase64: imageBase64 || '',
-    isActive: true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
+
+  const docRef = await addDoc(
+    collection(db, 'coupons'),
+    {
+      merchantId,
+      merchantName,
+
+      title,
+      description,
+
+      area,
+      address,
+
+      googleMapUrl,
+
+      imageBase64:
+        imageBase64 || '',
+
+      isActive: true,
+
+      createdAt:
+        serverTimestamp(),
+
+      updatedAt:
+        serverTimestamp(),
+    }
+  )
 
   return docRef.id
 }
 
-export async function getMerchantCoupons(merchantId) {
+// ⭐ 不使用 orderBy
+// ⭐ 前端自行排序
+export async function getMerchantCoupons(
+  merchantId
+) {
+
   const q = query(
     collection(db, 'coupons'),
-    where('merchantId', '==', merchantId),
-    orderBy('createdAt', 'desc')
+
+    where(
+      'merchantId',
+      '==',
+      merchantId
+    )
   )
 
   const snap = await getDocs(q)
 
-  return snap.docs.map((d) => ({
+  const list = snap.docs.map((d) => ({
     id: d.id,
     ...d.data(),
   }))
-}
 
-export async function updateCouponStatus(couponId, isActive) {
-  await updateDoc(doc(db, 'coupons', couponId), {
-    isActive,
-    updatedAt: serverTimestamp(),
+  // 前端排序
+  list.sort((a, b) => {
+
+    const aTime =
+      a.createdAt?.seconds || 0
+
+    const bTime =
+      b.createdAt?.seconds || 0
+
+    return bTime - aTime
   })
+
+  return list
 }
 
-export async function deleteCoupon(couponId) {
-  await deleteDoc(doc(db, 'coupons', couponId))
+export async function updateCouponStatus(
+  couponId,
+  isActive
+) {
+
+  await updateDoc(
+    doc(db, 'coupons', couponId),
+    {
+      isActive,
+
+      updatedAt:
+        serverTimestamp(),
+    }
+  )
+}
+
+export async function deleteCoupon(
+  couponId
+) {
+
+  await deleteDoc(
+    doc(db, 'coupons', couponId)
+  )
 }
