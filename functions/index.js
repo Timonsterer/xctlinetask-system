@@ -7,7 +7,7 @@ const axios = require('axios')
 
 admin.initializeApp()
 
-const LINE_TOKEN = "aJdHrp9V8uX75wOOaTPriztvvAkoiqhNItewcdI/oPeQLfw02AVWgoRSx3HN8vcRqD0/jVbWIQ4+J6kaSXrqWu4viIn44060THxh5CRoxdsYshKERXv3RSAyycpcsHfnhiR5s3a64ZEJ1vs7L56z3QdB04t89/1O/w1cDnyilFU="
+const LINE_TOKEN = "請貼回你原本的 LINE_TOKEN"
 const LIFF_URL = 'https://liff.line.me/2009690445-fzD5YF3K'
 
 const db = admin.firestore()
@@ -53,8 +53,99 @@ exports.checkNoTaskOnce = onCall(
       { merge: true }
     )
 
-    // 空白任務通知已關閉
     return { success: true, notified: false }
+  }
+)
+
+// ==========================
+// 新優惠券 → 通知所有使用者，只提醒一次
+// ==========================
+exports.onCouponCreated = onDocumentCreated(
+  {
+    document: 'coupons/{id}',
+    region: 'asia-east1',
+  },
+  async (event) => {
+    const snap = event.data
+    if (!snap) return
+
+    const coupon = snap.data()
+    if (!coupon) return
+    if (coupon.couponPushSent === true) return
+
+    const title =
+      coupon.title ||
+      coupon.discountText ||
+      '新優惠券'
+
+    const merchantName =
+      coupon.merchantName ||
+      '合作店家'
+
+    const endDateText = coupon.endDate
+      ? `\n有效期限：${coupon.endDate}`
+      : ''
+
+    try {
+      const usersSnap = await db.collection('users').get()
+
+      const targets = []
+
+      usersSnap.forEach((docSnap) => {
+        const user = docSnap.data()
+
+        const lineUserId =
+          user.lineUserId ||
+          user.userId ||
+          docSnap.id
+
+        if (lineUserId) {
+          targets.push(lineUserId)
+        }
+      })
+
+      const uniqueTargets = [...new Set(targets)]
+
+      await Promise.all(
+        uniqueTargets.map((lineUserId) =>
+          pushLine(
+            lineUserId,
+            `有新的探店優惠券\n` +
+              `店家：${merchantName}\n` +
+              `優惠：${title}${endDateText}\n\n` +
+              `👉 點這裡查看優惠券：\n${LIFF_URL}`
+          )
+        )
+      )
+
+      await snap.ref.set(
+        {
+          couponPushSent: true,
+          couponPushSentAt: admin.firestore.FieldValue.serverTimestamp(),
+          couponPushTargetCount: uniqueTargets.length,
+        },
+        { merge: true }
+      )
+
+      logger.info('新優惠券通知成功', {
+        couponId: event.params.id,
+        targetCount: uniqueTargets.length,
+      })
+    } catch (err) {
+      logger.error('新優惠券通知失敗', {
+        message: err?.message,
+        response: err?.response?.data,
+      })
+
+      await snap.ref.set(
+        {
+          couponPushSent: false,
+          couponPushError: JSON.stringify(err?.response?.data || err?.message || ''),
+          couponPushErrorAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      )
+    }
   }
 )
 
