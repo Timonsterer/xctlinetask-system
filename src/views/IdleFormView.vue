@@ -1,16 +1,21 @@
 <template>
-  <div class="idle-form-page">
-    <div class="page-header">
-      <h1>我很閒</h1>
-      <p>把你現在可約、可幫忙、可接單的狀態發出去</p>
-    </div>
+  <div class="page idle-form-page">
+    <div class="card form-card">
+      <div class="page-header">
+        <div>
+          <p class="eyebrow">IDLE</p>
+          <h1 class="title">我很閒</h1>
+          <p class="sub">把你現在可約、可幫忙、可接單的狀態發出去</p>
+        </div>
 
-    <div class="card">
-      <div v-if="loading" class="loading">載入中...</div>
+        <div class="header-icon">閒</div>
+      </div>
+
+      <div v-if="loading" class="card-soft loading">載入中...</div>
 
       <div v-else>
-        <div v-if="error" class="alert error">{{ error }}</div>
-        <div v-if="success" class="alert success">{{ success }}</div>
+        <div v-if="error" class="alert alert-error">{{ error }}</div>
+        <div v-if="success" class="alert alert-success">{{ success }}</div>
 
         <form class="form" @submit.prevent="handleSubmit">
           <div class="form-group">
@@ -65,6 +70,7 @@
 
           <div class="form-group">
             <label>可以做的類型</label>
+
             <div class="chips">
               <button
                 type="button"
@@ -124,24 +130,27 @@
             />
           </div>
 
-          <div class="form-group">
+          <div class="switch-card">
             <label class="switch-row">
               <input v-model="form.isActive" type="checkbox" />
-              <span>立即上架到「我很閒市場」</span>
+              <span>
+                <strong>立即上架到「我很閒市場」</strong>
+                <small>開啟後，其他人可以在市場看到你的狀態。</small>
+              </span>
             </label>
           </div>
 
           <div class="actions">
-            <button class="btn primary" type="submit" :disabled="saving">
+            <button class="btn" type="submit" :disabled="saving">
               {{ saving ? '儲存中...' : '儲存狀態' }}
             </button>
 
-            <button class="btn" type="button" @click="goMarket">
+            <button class="btn btn-blue" type="button" @click="goMarket">
               去看我很閒市場
             </button>
 
             <button
-              class="btn danger"
+              class="btn btn-red"
               type="button"
               @click="turnOffIdle"
               :disabled="saving"
@@ -325,6 +334,7 @@ const handleSubmit = async () => {
   resetMessage()
 
   const userId = getUserId()
+
   if (!userId) {
     error.value = '尚未取得 userId，請先完成綁定'
     return
@@ -345,7 +355,10 @@ const handleSubmit = async () => {
     return
   }
 
-  if (new Date(form.availableTo).getTime() <= new Date(form.availableFrom).getTime()) {
+  if (
+    new Date(form.availableTo).getTime() <=
+    new Date(form.availableFrom).getTime()
+  ) {
     error.value = '結束時間必須晚於開始時間'
     return
   }
@@ -386,7 +399,9 @@ const handleSubmit = async () => {
       { merge: true }
     )
 
-    success.value = form.isActive ? '已上架到我很閒市場' : '已儲存，但目前未上架'
+    success.value = form.isActive
+      ? '已上架到我很閒市場'
+      : '已儲存，但目前未上架'
   } catch (err) {
     console.error(err)
     error.value = '儲存失敗，請檢查 Firebase 設定'
@@ -399,6 +414,7 @@ const turnOffIdle = async () => {
   resetMessage()
 
   const userId = getUserId()
+
   if (!userId) {
     error.value = '尚未取得 userId，請先完成綁定'
     return
@@ -442,166 +458,227 @@ onMounted(() => {
 .idle-form-page {
   max-width: 760px;
   margin: 0 auto;
-  padding: 20px;
+}
+
+.form-card {
+  overflow: hidden;
 }
 
 .page-header {
-  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 22px;
 }
 
-.page-header h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  font-weight: 800;
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #9b7b00;
 }
 
-.page-header p {
-  margin: 0;
-  color: #666;
-}
+.header-icon {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
 
-.card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #fff1a8;
+  border: 2px solid #1e1e1e;
+  border-radius: 20px;
+
+  font-size: 26px;
+  font-weight: 900;
+
+  box-shadow: 0 5px 0 #1e1e1e;
 }
 
 .loading {
-  padding: 24px 0;
   text-align: center;
-  color: #666;
+  font-weight: 800;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
+}
+
+.form-group {
+  width: 100%;
+  min-width: 0;
 }
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  font-size: 14px;
-  font-weight: 700;
-  color: #333;
-}
-
-.form-group input,
-.form-group textarea {
   width: 100%;
-  border: 1px solid #dcdcdc;
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 15px;
-  box-sizing: border-box;
-  outline: none;
 }
 
-.form-group input:focus,
-.form-group textarea:focus {
-  border-color: #222;
+.form-row .form-group {
+  min-width: 0;
+}
+
+.form-row input[type='datetime-local'] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 14px;
+  padding-left: 10px;
+  padding-right: 8px;
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  width: 100%;
 }
 
 .chip {
-  border: 1px solid #d0d0d0;
-  background: #fff;
-  color: #333;
-  padding: 10px 14px;
+  width: auto;
+  min-width: 92px;
+
+  background: #ffffff;
+  color: #1e1e1e;
+
+  border: 2px solid #1e1e1e;
   border-radius: 999px;
-  cursor: pointer;
+
+  padding: 10px 14px;
+
   font-size: 14px;
+  font-weight: 900;
+
+  box-shadow: 0 4px 0 #1e1e1e;
 }
 
 .chip.active {
-  background: #111;
-  color: #fff;
-  border-color: #111;
+  background: #ffd84d;
+}
+
+.switch-card {
+  width: 100%;
+  max-width: 100%;
+
+  background: #fff8e8;
+
+  border: 2px solid #1e1e1e;
+  border-radius: 18px;
+
+  padding: 14px;
+
+  margin: 4px 0 12px;
+
+  box-shadow: 0 5px 0 #1e1e1e;
 }
 
 .switch-row {
+  width: 100%;
+  max-width: 100%;
+
   display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
+  align-items: flex-start;
+  gap: 12px;
+
+  margin: 0;
+  cursor: pointer;
+}
+
+.switch-row input {
+  width: 22px;
+  height: 22px;
+
+  flex: 0 0 22px;
+
+  margin: 2px 0 0;
+  padding: 0;
+
+  accent-color: #ffd84d;
+}
+
+.switch-row span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.switch-row strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.switch-row small {
+  color: #666;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 .alert {
   margin-bottom: 14px;
   padding: 12px 14px;
-  border-radius: 12px;
+
+  border: 2px solid #1e1e1e;
+  border-radius: 16px;
+
   font-size: 14px;
+  font-weight: 800;
 }
 
-.alert.error {
-  background: #fff1f1;
-  color: #b42318;
+.alert-error {
+  background: #ffdcdc;
+  color: #9f1239;
 }
 
-.alert.success {
-  background: #eefbf3;
-  color: #067647;
+.alert-success {
+  background: #dff8df;
+  color: #166534;
 }
 
 .actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
-.btn {
-  border: none;
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-size: 15px;
-  cursor: pointer;
-  background: #ececec;
-  color: #222;
-}
-
-.btn.primary {
-  background: #111;
-  color: #fff;
-}
-
-.btn.danger {
-  background: #ffe7e7;
-  color: #b42318;
-}
-
-.btn:disabled {
+button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
 @media (max-width: 640px) {
   .idle-form-page {
-    padding: 16px;
+    max-width: 100%;
+  }
+
+  .page-header {
+    flex-direction: column;
+  }
+
+  .header-icon {
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
   }
 
   .form-row {
     grid-template-columns: 1fr;
   }
 
-  .actions {
-    flex-direction: column;
+  .form-row input[type='datetime-local'] {
+    font-size: 13px;
+  }
+
+  .chip {
+    flex: 1;
+    min-width: calc(50% - 8px);
   }
 }
 </style>
