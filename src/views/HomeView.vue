@@ -1,105 +1,110 @@
 <template>
-  <div class="home-page">
-    <section class="hero-card">
+  <div class="page home-page">
+    <section class="hero-task">
       <div class="hero-top">
         <div>
           <p class="eyebrow">TODAY</p>
-          <h1>當前任務</h1>
+          <h1 class="title">當前任務</h1>
         </div>
 
-        <button class="icon-btn" @click="goTaskForm">
-          ＋
+        <button class="btn btn-small hero-add-btn" @click="goTaskForm">
+          ＋ 新增
         </button>
       </div>
 
-      <div v-if="loading" class="empty-box">
+      <div v-if="loading" class="card-soft state-box">
         <h2>任務載入中...</h2>
       </div>
 
-      <div v-else-if="currentTask" class="current-box">
-        <p class="task-label">
+      <div v-else-if="currentTask" class="card-soft state-box">
+        <p class="badge badge-yellow">
           現在要做
-          <span v-if="currentTask.source === 'template' || currentTask.type === 'life_template'">
+          <span
+            v-if="
+              currentTask.source === 'template' ||
+              currentTask.type === 'life_template'
+            "
+          >
             ・人物套版
           </span>
         </p>
 
-        <h2>{{ taskTitle(currentTask) }}</h2>
+        <h2 class="hero-task-title">{{ taskTitle(currentTask) }}</h2>
 
-        <p v-if="currentTask.note" class="task-note">
+        <p v-if="currentTask.note" class="hero-task-time">
           {{ currentTask.note }}
         </p>
 
-        <button class="main-btn" @click="goNextTask">
-          完成，下一個任務
+        <button class="btn" @click="goNextTask">
+          ✓ 完成，下一個任務
         </button>
       </div>
 
-      <div v-else class="empty-box">
-        <div class="empty-icon">✓</div>
-        <h2>目前沒有任務</h2>
-        <p>先新增一個任務，讓今天不要空轉。</p>
+      <div v-else class="card-soft state-box">
+        <div class="icon">✓</div>
+        <h2 class="hero-task-title">目前沒有任務</h2>
+        <p class="hero-task-time">先新增一個任務，讓今天不要空轉。</p>
 
-        <button class="main-btn" @click="goTaskForm">
-          新增任務
+        <button class="btn" @click="goTaskForm">
+          ＋ 新增任務
         </button>
       </div>
     </section>
 
     <section class="quick-section">
-      <h3>快速功能</h3>
+      <h3 class="subtitle">快速功能</h3>
 
       <div class="grid">
-        <button class="menu-card blue" @click="goTaskForm">
-          <span class="emoji">＋</span>
+        <button class="menu-card btn-blue" @click="goTaskForm">
+          <span class="icon">＋</span>
           <strong>新增任務</strong>
           <small>安排下一件事</small>
         </button>
 
-        <button class="menu-card purple" @click="goTaskHistory">
-          <span class="emoji">📋</span>
+        <button class="menu-card btn-purple" @click="goTaskHistory">
+          <span class="icon">✓</span>
           <strong>任務紀錄</strong>
           <small>查看完成紀錄</small>
         </button>
 
-        <button class="menu-card gold" @click="goExploreShops">
-          <span class="emoji">🎟️</span>
+        <button class="menu-card btn-yellow" @click="goExploreShops">
+          <span class="icon">券</span>
           <strong>探店媒合</strong>
           <small>查看商家優惠與探店任務</small>
         </button>
 
-        <button class="menu-card green" @click="goPocketPlaces">
-          <span class="emoji">📍</span>
+        <button class="menu-card btn-green" @click="goPocketPlaces">
+          <span class="icon">地</span>
           <strong>口袋名單</strong>
           <small>收藏地點導航</small>
         </button>
 
-        <button class="menu-card orange" @click="goIdleForm">
-          <span class="emoji">🙋</span>
+        <button class="menu-card btn-orange" @click="goIdleForm">
+          <span class="icon">閒</span>
           <strong>我是閒置村民</strong>
           <small>發布自己為可邀約狀態</small>
         </button>
 
-        <button class="menu-card teal" @click="goIdleMarket">
-          <span class="emoji">🧑‍🤝‍🧑</span>
+        <button class="menu-card btn-teal" @click="goIdleMarket">
+          <span class="icon">約</span>
           <strong>閒置村民邀約</strong>
           <small>看看誰有空</small>
         </button>
 
-        <button class="menu-card gray" @click="goContacts">
-          <span class="emoji">☎️</span>
+        <button class="menu-card btn-secondary" @click="goContacts">
+          <span class="icon">人</span>
           <strong>聯絡人</strong>
           <small>客戶與朋友資料</small>
         </button>
 
-        <button class="menu-card pink" @click="goLifeTemplates">
-          <span class="emoji">🔥</span>
+        <button class="menu-card btn-red" @click="goLifeTemplates">
+          <span class="icon">版</span>
           <strong>人物套版</strong>
           <small>模仿高手生活</small>
         </button>
 
-        <button class="menu-card dark" @click="goRaid">
-          <span class="emoji">⚔️</span>
+        <button class="menu-card btn-yellow full" @click="goRaid">
+          <span class="icon">副</span>
           <strong>多人副本</strong>
           <small>一起完成任務</small>
         </button>
@@ -170,11 +175,7 @@ async function loadTasks() {
   loading.value = true
 
   try {
-    const q = query(
-      collection(db, 'tasks'),
-      where('userId', '==', userId)
-    )
-
+    const q = query(collection(db, 'tasks'), where('userId', '==', userId))
     const snap = await getDocs(q)
 
     const list = snap.docs
@@ -235,219 +236,102 @@ onMounted(() => {
 
 <style scoped>
 .home-page {
-  min-height: 100vh;
-  padding: 22px;
-  background:
-    radial-gradient(circle at top left, #dbeafe 0, transparent 32%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-  box-sizing: border-box;
-}
-
-.hero-card {
-  max-width: 760px;
-  margin: 0 auto 22px;
-  padding: 24px;
-  border-radius: 28px;
-  background: linear-gradient(135deg, #111827, #1e3a8a);
-  color: white;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+  max-width: 860px;
+  margin: 0 auto;
 }
 
 .hero-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .eyebrow {
   margin: 0 0 4px;
   font-size: 12px;
-  letter-spacing: 2px;
-  color: #bfdbfe;
-}
-
-h1 {
-  margin: 0;
-  font-size: 32px;
   font-weight: 900;
+  letter-spacing: 2px;
+  color: #8a6d00;
 }
 
-.icon-btn {
-  width: 48px;
-  height: 48px;
-  border: none;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.16);
-  color: white;
-  font-size: 28px;
-  cursor: pointer;
+.hero-add-btn {
+  white-space: nowrap;
 }
 
-.current-box,
-.empty-box {
-  margin-top: 26px;
-  padding: 22px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(10px);
+.state-box {
+  margin-top: 20px;
 }
 
-.task-label {
-  margin: 0 0 8px;
-  color: #bfdbfe;
-  font-size: 14px;
-}
-
-.current-box h2,
-.empty-box h2 {
-  margin: 0 0 16px;
-  font-size: 26px;
-  line-height: 1.35;
-}
-
-.task-note {
-  margin: -4px 0 18px;
-  color: #dbeafe;
-  line-height: 1.6;
-  font-size: 14px;
-}
-
-.empty-box p {
-  margin: -6px 0 18px;
-  color: #dbeafe;
-}
-
-.empty-icon {
-  width: 52px;
-  height: 52px;
-  margin-bottom: 14px;
-  display: grid;
-  place-items: center;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.18);
-  font-size: 26px;
-}
-
-.main-btn {
-  width: 100%;
-  padding: 15px;
-  border: none;
-  border-radius: 16px;
-  background: white;
-  color: #1e3a8a;
-  font-size: 16px;
-  font-weight: 800;
-  cursor: pointer;
+.state-box h2 {
+  margin: 14px 0 12px;
 }
 
 .quick-section {
-  max-width: 760px;
-  margin: 0 auto;
-}
-
-.quick-section h3 {
-  margin: 0 0 14px;
-  font-size: 20px;
-  color: #111827;
+  margin-top: 24px;
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 14px;
 }
 
 .menu-card {
-  min-height: 116px;
+  width: 100%;
+  min-height: 120px;
   padding: 16px;
-  border: none;
-  border-radius: 22px;
   text-align: left;
-  color: white;
-  cursor: pointer;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
 
-.menu-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
-}
-
-.emoji {
-  display: block;
-  font-size: 28px;
-  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .menu-card strong {
-  display: block;
   font-size: 17px;
-  margin-bottom: 5px;
+  font-weight: 900;
 }
 
 .menu-card small {
-  display: block;
+  color: #333;
   font-size: 13px;
-  opacity: 0.85;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
-.blue {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+.full {
+  grid-column: 1 / -1;
 }
 
-.purple {
-  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+.btn-yellow {
+  background: var(--primary);
 }
 
-.gold {
-  background: linear-gradient(135deg, #f59e0b, #b45309);
+.btn-orange {
+  background: #ffd0a6;
 }
 
-.green {
-  background: linear-gradient(135deg, #059669, #047857);
+.btn-teal {
+  background: #b8f3e8;
 }
 
-.orange {
-  background: linear-gradient(135deg, #f97316, #c2410c);
-}
-
-.teal {
-  background: linear-gradient(135deg, #0d9488, #0f766e);
-}
-
-.gray {
-  background: linear-gradient(135deg, #475569, #334155);
-}
-
-.pink {
-  background: linear-gradient(135deg, #db2777, #be185d);
-}
-
-.dark {
-  background: linear-gradient(135deg, #111827, #020617);
-}
-
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   .home-page {
-    padding: 16px;
+    max-width: none;
   }
 
-  .hero-card {
-    padding: 20px;
-    border-radius: 24px;
-  }
-
-  h1 {
-    font-size: 28px;
+  .hero-top {
+    align-items: flex-start;
   }
 
   .grid {
     grid-template-columns: 1fr;
   }
 
-  .menu-card {
-    min-height: 100px;
+  .full {
+    grid-column: auto;
   }
 }
 </style>
