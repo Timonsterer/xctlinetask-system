@@ -1,147 +1,220 @@
-/* =========================
-   XCT 活潑亮色系 UI
-   亮底 / 黑字 / 統一圓角 / 不使用圖片 icon
-========================= */
+/* ========================================
+   XCT Cute UI System
+======================================== */
 
 :root {
-  --bg: #f7f4ec;
+  --bg: #f8f5ef;
+
   --card: #ffffff;
-  --card-soft: #fff8e7;
+  --soft: #fff8e8;
 
-  --text: #1f1f1f;
-  --muted: #6b6b6b;
+  --text: #1e1e1e;
+  --sub: #666666;
 
-  --primary: #ffb703;
-  --primary-dark: #f59e0b;
+  --primary: #ffd84d;
+  --primary-hover: #ffcf1d;
 
-  --accent: #4cc9f0;
-  --danger: #ef4444;
-  --success: #22c55e;
+  --blue: #bfe7ff;
+  --green: #d8f8d8;
+  --red: #ffd6d6;
+  --purple: #ece2ff;
 
-  --border: #222222;
-  --line: #e5e0d6;
+  --border: #1e1e1e;
+  --line: #ebe7de;
 
-  --radius: 18px;
-  --shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  --shadow:
+    0 8px 20px rgba(0, 0, 0, 0.08);
+
+  --radius: 20px;
 }
 
-/* 全域 */
-
-html,
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family:
-    "Noto Sans TC",
-    "Microsoft JhengHei",
-    Arial,
-    sans-serif;
-}
+/* =========================
+   基本
+========================= */
 
 * {
   box-sizing: border-box;
 }
 
-/* 頁面 */
+html,
+body {
+  margin: 0;
+  padding: 0;
+
+  background: var(--bg);
+  color: var(--text);
+
+  font-family:
+    "Noto Sans TC",
+    "Microsoft JhengHei",
+    sans-serif;
+}
+
+/* =========================
+   頁面
+========================= */
 
 .page {
   min-height: 100vh;
+
   padding: 20px;
+
   background:
-    radial-gradient(circle at top left, #fff1b8 0, transparent 240px),
-    radial-gradient(circle at bottom right, #c7f9ff 0, transparent 260px),
+    radial-gradient(
+      circle at top left,
+      #fff1b8 0,
+      transparent 240px
+    ),
+    radial-gradient(
+      circle at bottom right,
+      #d9f4ff 0,
+      transparent 260px
+    ),
     var(--bg);
 }
 
-/* 卡片 */
-
-.card,
-.task-card {
-  background: var(--card);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 16px;
-  box-shadow: var(--shadow);
-}
-
-/* 柔色卡片 */
-
-.card-soft {
-  background: var(--card-soft);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 16px;
-  box-shadow: var(--shadow);
-}
-
-/* 標題 */
+/* =========================
+   標題
+========================= */
 
 .title {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 900;
-  margin-bottom: 16px;
-  color: var(--text);
+
+  margin-bottom: 8px;
 }
 
 .subtitle {
   font-size: 18px;
   font-weight: 800;
+
   margin-bottom: 10px;
 }
 
-.sub,
-.muted {
-  color: var(--muted);
+.sub {
+  color: var(--sub);
   font-size: 14px;
 }
 
-/* 表單 */
+/* =========================
+   卡片
+========================= */
 
-label {
-  display: block;
-  font-weight: 800;
-  margin-bottom: 6px;
+.card {
+  background: var(--card);
+
+  border: 2px solid var(--border);
+
+  border-radius: var(--radius);
+
+  padding: 18px;
+
+  margin-bottom: 16px;
+
+  box-shadow: var(--shadow);
 }
+
+.card-soft {
+  background: var(--soft);
+
+  border: 2px solid var(--border);
+
+  border-radius: var(--radius);
+
+  padding: 18px;
+
+  margin-bottom: 16px;
+
+  box-shadow: var(--shadow);
+}
+
+/* =========================
+   Hero 任務
+========================= */
+
+.hero-task {
+  background: #fff2bf;
+
+  border: 2px solid var(--border);
+
+  border-radius: 28px;
+
+  padding: 24px;
+
+  margin-bottom: 20px;
+
+  box-shadow:
+    0 10px 0 #1e1e1e;
+}
+
+.hero-task-title {
+  font-size: 28px;
+  font-weight: 900;
+
+  margin-bottom: 10px;
+}
+
+.hero-task-time {
+  color: var(--sub);
+
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* =========================
+   統一輸入框
+========================= */
 
 input,
 textarea,
 select {
   width: 100%;
+
   background: #ffffff;
   color: var(--text);
 
   border: 2px solid var(--border);
-  border-radius: 14px;
 
-  padding: 13px 14px;
+  border-radius: 16px;
+
+  padding: 14px;
+
   margin-top: 6px;
   margin-bottom: 16px;
 
   font-size: 16px;
+
+  transition: 0.2s;
+
   outline: none;
 }
+
+/* focus */
 
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--primary-dark);
-  box-shadow: 0 0 0 4px rgba(255, 183, 3, 0.25);
+  border-color: #ffb800;
+
+  box-shadow:
+    0 0 0 5px
+    rgba(255, 216, 77, 0.35);
 }
 
-/* 按鈕 */
+/* =========================
+   統一按鈕
+========================= */
 
-.btn,
-button {
+button,
+.btn {
   width: 100%;
 
   background: var(--primary);
-  color: #111;
+  color: #1e1e1e;
 
   border: 2px solid var(--border);
-  border-radius: 16px;
+
+  border-radius: 18px;
 
   padding: 14px 16px;
 
@@ -150,73 +223,169 @@ button {
 
   cursor: pointer;
 
-  box-shadow: 0 5px 0 #111;
-  transition: 0.15s ease;
+  box-shadow:
+    0 5px 0 #1e1e1e;
+
+  transition: 0.15s;
 }
 
-.btn:hover,
-button:hover {
+/* hover */
+
+button:hover,
+.btn:hover {
+  background: var(--primary-hover);
+
   transform: translateY(-2px);
-  background: #ffd166;
 }
 
-.btn:active,
-button:active {
+/* click */
+
+button:active,
+.btn:active {
   transform: translateY(3px);
-  box-shadow: 0 2px 0 #111;
+
+  box-shadow:
+    0 2px 0 #1e1e1e;
 }
 
-/* 次要按鈕 */
+/* =========================
+   次要按鈕
+========================= */
 
 .btn-secondary {
   background: #ffffff;
-  color: #111;
 }
 
-/* 藍色按鈕 */
+/* 藍 */
 
 .btn-blue {
-  background: var(--accent);
-  color: #111;
+  background: var(--blue);
 }
 
-/* 危險按鈕 */
+/* 綠 */
 
-.btn-danger {
-  background: #ff6b6b;
-  color: #111;
+.btn-green {
+  background: var(--green);
 }
 
-/* 成功按鈕 */
+/* 紅 */
 
-.btn-success {
-  background: #86efac;
-  color: #111;
+.btn-red {
+  background: var(--red);
+}
+
+/* 紫 */
+
+.btn-purple {
+  background: var(--purple);
 }
 
 /* 小按鈕 */
 
 .btn-small {
   width: auto;
+
   padding: 8px 14px;
+
   font-size: 14px;
+
   border-radius: 999px;
 }
 
-/* 按鈕群 */
+/* =========================
+   badge
+========================= */
 
-.actions {
+.badge {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  border: 2px solid var(--border);
+
+  border-radius: 999px;
+
+  padding: 6px 12px;
+
+  background: #ffffff;
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* badge 顏色 */
+
+.badge-yellow {
+  background: #fff1a8;
+}
+
+.badge-blue {
+  background: #d8efff;
+}
+
+.badge-green {
+  background: #dff8df;
+}
+
+.badge-red {
+  background: #ffdcdc;
+}
+
+.badge-purple {
+  background: #eee3ff;
+}
+
+/* =========================
+   icon
+========================= */
+
+.icon {
+  width: 34px;
+  height: 34px;
+
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 12px;
+
+  border: 2px solid var(--border);
+
+  background: #ffffff;
+
+  font-size: 16px;
+  font-weight: 900;
+}
+
+/* =========================
+   list
+========================= */
+
+.list {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+
+  gap: 14px;
 }
 
-.actions .btn,
-.actions button {
-  flex: 1;
+.list-item {
+  background: #ffffff;
+
+  border: 2px solid var(--border);
+
+  border-radius: 20px;
+
+  padding: 16px;
+
+  box-shadow: var(--shadow);
 }
 
-/* Flex */
+/* =========================
+   flex
+========================= */
 
 .row {
   display: flex;
@@ -229,131 +398,62 @@ button:active {
   gap: 12px;
 }
 
-/* Badge */
+/* =========================
+   actions
+========================= */
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.actions {
+  display: flex;
+  gap: 10px;
 
-  background: #fff;
-  color: #111;
-
-  border: 2px solid var(--border);
-  border-radius: 999px;
-
-  padding: 5px 12px;
-
-  font-size: 13px;
-  font-weight: 800;
+  flex-wrap: wrap;
 }
 
-/* 狀態 */
-
-.badge-success {
-  background: #bbf7d0;
+.actions button,
+.actions .btn {
+  flex: 1;
 }
 
-.badge-danger {
-  background: #fecaca;
-}
-
-.badge-blue {
-  background: #bae6fd;
-}
-
-.badge-yellow {
-  background: #fde68a;
-}
-
-/* 空狀態 */
+/* =========================
+   empty
+========================= */
 
 .empty {
   text-align: center;
-  color: var(--muted);
+
+  color: var(--sub);
+
   padding: 40px 0;
+
   font-weight: 700;
 }
 
-/* 不用圖片 icon，用文字符號 */
-
-.icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 28px;
-  height: 28px;
-
-  border: 2px solid #111;
-  border-radius: 50%;
-
-  background: #fff;
-  color: #111;
-
-  font-size: 15px;
-  font-weight: 900;
-}
-
-/* 首頁大任務 */
-
-.hero-task {
-  background: #fff3bf;
-  border: 2px solid #111;
-  border-radius: 24px;
-  padding: 22px;
-  margin-bottom: 18px;
-  box-shadow: 0 8px 0 #111;
-}
-
-.hero-task-title {
-  font-size: 22px;
-  font-weight: 900;
-  margin-bottom: 8px;
-}
-
-.hero-task-time {
-  font-size: 15px;
-  font-weight: 800;
-  color: #555;
-}
-
-/* 清單 */
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.list-item {
-  background: #fff;
-  border: 2px solid #111;
-  border-radius: 18px;
-  padding: 16px;
-  box-shadow: var(--shadow);
-}
-
-/* 連結 */
+/* =========================
+   a
+========================= */
 
 a {
-  color: #111;
-  font-weight: 900;
+  color: inherit;
+
   text-decoration: none;
+
+  font-weight: 800;
 }
 
-a:hover {
-  text-decoration: underline;
-}
+/* =========================
+   手機
+========================= */
 
-/* 手機優化 */
-
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .page {
     padding: 16px;
   }
 
   .title {
+    font-size: 26px;
+  }
+
+  .hero-task-title {
     font-size: 24px;
   }
 
