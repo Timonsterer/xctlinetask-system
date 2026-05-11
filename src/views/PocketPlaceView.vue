@@ -12,7 +12,7 @@
     </header>
 
     <section class="search-box">
-      <input v-model="keyword" placeholder="搜尋地點名稱" />
+      <input v-model="keyword" placeholder="搜尋地點名稱 / 地址" />
     </section>
 
     <section v-if="filteredPlaces.length === 0" class="empty">
@@ -36,27 +36,27 @@
           </p>
 
           <div class="action-grid">
-            <button class="action-btn" @click="openMap(place)">
+            <button class="action-btn" type="button" @click.stop="openMap(place)">
               地圖導航
             </button>
 
-            <button class="action-btn blue" @click="addToTask(place)">
+            <button class="action-btn blue" type="button" @click.stop="addToTask(place)">
               一鍵加入任務
             </button>
 
-            <button class="action-btn purple" @click="createRaid(place)">
+            <button class="action-btn purple" type="button" @click.stop="createRaid(place)">
               發起多人副本
             </button>
 
-            <button class="action-btn green" @click="sharePlace(place)">
+            <button class="action-btn green" type="button" @click.stop="sharePlace(place)">
               分享
             </button>
 
-            <button class="action-btn" @click="editPlace(place)">
+            <button class="action-btn" type="button" @click.stop="editPlace(place)">
               編輯
             </button>
 
-            <button class="action-btn red" @click="deletePlace(place.id)">
+            <button class="action-btn red" type="button" @click.stop="deletePlace(place.id)">
               刪除
             </button>
           </div>
@@ -70,17 +70,17 @@
 
         <div class="form-grid">
           <input v-model="form.name" placeholder="地點名稱" />
-          <input v-model="form.address" placeholder="地址" />
+          <input v-model="form.address" placeholder="地址，導航會優先用這個" />
           <input v-model="form.imageUrl" placeholder="圖片網址" />
           <textarea v-model="form.description" placeholder="介紹" />
         </div>
 
         <div class="modal-actions">
-          <button class="action-btn blue" @click="savePlace">
+          <button class="action-btn blue" type="button" @click="savePlace">
             {{ editingId ? '更新' : '新增' }}
           </button>
 
-          <button class="action-btn" @click="closeModal">
+          <button class="action-btn" type="button" @click="closeModal">
             取消
           </button>
         </div>
@@ -139,6 +139,15 @@ const makePlaceKey = (place) => {
     .toLowerCase()
 
   return `${name}__${address}`
+}
+
+const buildGoogleMapsUrl = (place) => {
+  const address = String(place.address || '').trim()
+  const name = String(place.name || place.merchantName || '').trim()
+
+  const queryText = address || name
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryText)}`
 }
 
 const uniquePlaces = computed(() => {
@@ -294,17 +303,16 @@ const deletePlace = async (id) => {
 }
 
 const openMap = (place) => {
-  if (place.googleMapUrl || place.mapUrl) {
-    window.open(place.googleMapUrl || place.mapUrl, '_blank')
+  const queryText = String(place.address || place.name || '').trim()
+
+  if (!queryText) {
+    alert('這筆地點沒有地址或名稱，無法導航')
     return
   }
 
-  const query = encodeURIComponent(place.address || place.name)
+  const url = buildGoogleMapsUrl(place)
 
-  window.open(
-    `https://www.google.com/maps/search/?api=1&query=${query}`,
-    '_blank'
-  )
+  window.location.assign(url)
 }
 
 const addToTask = async (place) => {
@@ -318,12 +326,7 @@ const addToTask = async (place) => {
       title: `前往：${place.name}`,
       description: place.description || place.note || '',
       address: place.address || '',
-      mapUrl:
-        place.googleMapUrl ||
-        place.mapUrl ||
-        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          place.address || place.name
-        )}`,
+      mapUrl: buildGoogleMapsUrl(place),
       type: 'pocket_place',
       pocketPlaceId: place.id,
       pocketPlaceName: place.name,
@@ -353,12 +356,7 @@ const createRaid = async (place) => {
       description: place.description || place.note || '',
       address: place.address || '',
       imageUrl: place.imageUrl || '',
-      mapUrl:
-        place.googleMapUrl ||
-        place.mapUrl ||
-        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          place.address || place.name
-        )}`,
+      mapUrl: buildGoogleMapsUrl(place),
       ownerId: lineUserId,
       pocketPlaceId: place.id,
       status: 'recruiting',
@@ -380,7 +378,7 @@ const sharePlace = async (place) => {
     const text =
       `${place.name}\n` +
       `${place.address || ''}\n` +
-      `${place.googleMapUrl || place.mapUrl || ''}`
+      `${buildGoogleMapsUrl(place)}`
 
     if (navigator.share) {
       await navigator.share({
@@ -396,6 +394,7 @@ const sharePlace = async (place) => {
       doc(db, 'pocket_places', place.id),
       {
         isShared: true,
+        visibility: 'public',
         sharedAt: serverTimestamp(),
       }
     )
