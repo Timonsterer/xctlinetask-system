@@ -31,6 +31,10 @@
 
         <h2 class="hero-task-title">{{ taskTitle(currentTask) }}</h2>
 
+        <p class="hero-task-time">
+          {{ taskTimeText(currentTask) }}
+        </p>
+
         <p v-if="currentTask.note" class="hero-task-time">
           {{ currentTask.note }}
         </p>
@@ -42,8 +46,8 @@
 
       <div v-else class="card-soft state-box">
         <div class="icon">✓</div>
-        <h2 class="hero-task-title">目前沒有任務</h2>
-        <p class="hero-task-time">先新增一個任務，讓今天不要空轉。</p>
+        <h2 class="hero-task-title">目前沒有當前時段任務</h2>
+        <p class="hero-task-time">只會顯示今天且現在時段內的任務。</p>
 
         <button class="btn" @click="goTaskForm">
           ＋ 新增任務
@@ -157,11 +161,121 @@ function taskTitle(task) {
   return task?.content || task?.title || task?.name || '未命名任務'
 }
 
+function toDate(value) {
+  if (!value) return null
+  if (typeof value.toDate === 'function') return value.toDate()
+  if (typeof value.toMillis === 'function') return new Date(value.toMillis())
+  if (value instanceof Date) return value
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 function safeTime(value) {
-  if (!value) return 0
-  if (typeof value.toMillis === 'function') return value.toMillis()
-  if (value instanceof Date) return value.getTime()
-  return 0
+  const date = toDate(value)
+  return date ? date.getTime() : 0
+}
+
+function isSameDate(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  )
+}
+
+function parseTimeToMinutes(value) {
+  if (!value) return null
+
+  const text = String(value).trim()
+
+  if (/^\d{1,2}:\d{2}$/.test(text)) {
+    const [h, m] = text.split(':').map(Number)
+    return h * 60 + m
+  }
+
+  if (/^\d{3,4}$/.test(text)) {
+    const padded = text.padStart(4, '0')
+    const h = Number(padded.slice(0, 2))
+    const m = Number(padded.slice(2, 4))
+    return h * 60 + m
+  }
+
+  return null
+}
+
+function getTaskStartDate(task) {
+  return (
+    toDate(task.startAt) ||
+    toDate(task.startTimeAt) ||
+    toDate(task.scheduledAt) ||
+    toDate(task.date) ||
+    toDate(task.taskDate) ||
+    null
+  )
+}
+
+function getTaskEndDate(task, startDate) {
+  const endDate =
+    toDate(task.endAt) ||
+    toDate(task.endTimeAt) ||
+    toDate(task.dueAt) ||
+    null
+
+  if (endDate) return endDate
+
+  const duration =
+    Number(task.durationMinutes) ||
+    Number(task.duration) ||
+    Number(task.minutes) ||
+    30
+
+  return new Date(startDate.getTime() + duration * 60 * 1000)
+}
+
+function isTaskActiveNow(task) {
+  const now = new Date()
+  const startDate = getTaskStartDate(task)
+
+  if (!startDate) return false
+  if (!isSameDate(startDate, now)) return false
+
+  let start = startDate
+  let end = getTaskEndDate(task, start)
+
+  const startMinutes = parseTimeToMinutes(task.startTime)
+  const endMinutes = parseTimeToMinutes(task.endTime)
+
+  if (startMinutes !== null) {
+    start = new Date(startDate)
+    start.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0)
+  }
+
+  if (endMinutes !== null) {
+    end = new Date(startDate)
+    end.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0)
+  }
+
+  return now >= start && now < end
+}
+
+function taskTimeText(task) {
+  const start = getTaskStartDate(task)
+  if (!start) return '未設定時間'
+
+  const end = getTaskEndDate(task, start)
+
+  const startText = start.toLocaleTimeString('zh-TW', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  const endText = end.toLocaleTimeString('zh-TW', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  return `${startText} - ${endText}`
 }
 
 async function loadTasks() {
@@ -191,7 +305,7 @@ async function loadTasks() {
       })
 
     taskList.value = list
-    currentTask.value = list[0] || null
+    currentTask.value = list.find((task) => isTaskActiveNow(task)) || null
   } catch (err) {
     console.error('讀取任務失敗:', err)
     alert('讀取任務失敗，請檢查 Firestore 權限')
