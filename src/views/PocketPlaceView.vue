@@ -1,18 +1,24 @@
 <template>
-  <div class="pocket-page">
-    <header class="header">
+  <div class="page pocket-page">
+    <header class="card page-header">
       <div>
-        <p class="eyebrow">口袋名單</p>
-        <h1>我的收藏地點</h1>
+        <p class="eyebrow">POCKET</p>
+        <h1 class="title">我的收藏地點</h1>
+        <p class="sub">收藏想去的店家，快速導航、加入任務或發起多人副本。</p>
       </div>
 
-      <button class="add-btn" @click="openCreateModal">
-        新增地點
+      <button class="btn btn-small add-btn" @click="openCreateModal">
+        ＋ 新增地點
       </button>
     </header>
 
-    <section class="search-box">
-      <input v-model="keyword" placeholder="搜尋地點名稱 / 地址" />
+    <section class="card-soft search-box">
+      <label for="keyword">搜尋口袋名單</label>
+      <input
+        id="keyword"
+        v-model="keyword"
+        placeholder="搜尋地點名稱 / 地址"
+      />
     </section>
 
     <section v-if="filteredPlaces.length === 0" class="empty">
@@ -23,41 +29,86 @@
       <div
         v-for="place in filteredPlaces"
         :key="place.id"
-        class="place-card"
+        class="card place-card"
       >
-        <img v-if="place.imageUrl" :src="place.imageUrl" class="cover" />
+        <img
+          v-if="place.imageUrl"
+          :src="place.imageUrl"
+          class="cover"
+          alt="地點照片"
+        />
 
         <div class="content">
-          <h2>{{ place.name }}</h2>
-          <p class="address">{{ place.address || '無地址' }}</p>
+          <div class="place-title-row">
+            <div>
+              <h2>{{ place.name }}</h2>
+              <p class="address">
+                {{ place.address || '無地址' }}
+              </p>
+            </div>
+
+            <span class="badge badge-yellow">
+              收藏
+            </span>
+          </div>
 
           <p class="description">
             {{ place.description || place.note || '無介紹' }}
           </p>
 
           <div class="action-grid">
-            <button class="action-btn" type="button" @click.stop="openMap(place)">
-              地圖導航
+            <button
+              class="btn btn-blue action-btn"
+              type="button"
+              @click.stop="openMap(place)"
+            >
+              <span>地圖</span>
+              <small>導航</small>
             </button>
 
-            <button class="action-btn blue" type="button" @click.stop="addToTask(place)">
-              一鍵加入任務
+            <button
+              class="btn btn-green action-btn"
+              type="button"
+              @click.stop="addToTask(place)"
+            >
+              <span>任務</span>
+              <small>加入</small>
             </button>
 
-            <button class="action-btn purple" type="button" @click.stop="createRaid(place)">
-              發起多人副本
+            <button
+              class="btn btn-purple action-btn"
+              type="button"
+              @click.stop="createRaid(place)"
+            >
+              <span>副本</span>
+              <small>揪團</small>
             </button>
 
-            <button class="action-btn green" type="button" @click.stop="sharePlace(place)">
-              分享
+            <button
+              class="btn btn-yellow action-btn"
+              type="button"
+              @click.stop="sharePlace(place)"
+            >
+              <span>分享</span>
+              <small>公開</small>
             </button>
 
-            <button class="action-btn" type="button" @click.stop="editPlace(place)">
-              編輯
+            <button
+              class="btn btn-secondary action-btn"
+              type="button"
+              @click.stop="editPlace(place)"
+            >
+              <span>編輯</span>
+              <small>修改</small>
             </button>
 
-            <button class="action-btn red" type="button" @click.stop="deletePlace(place.id)">
-              刪除
+            <button
+              class="btn btn-red action-btn"
+              type="button"
+              @click.stop="deletePlace(place.id)"
+            >
+              <span>刪除</span>
+              <small>移除</small>
             </button>
           </div>
         </div>
@@ -65,22 +116,46 @@
     </section>
 
     <div v-if="showModal" class="modal">
-      <div class="modal-card">
-        <h2>{{ editingId ? '編輯地點' : '新增地點' }}</h2>
+      <div class="card modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">PLACE</p>
+            <h2>{{ editingId ? '編輯地點' : '新增地點' }}</h2>
+          </div>
+
+          <button class="btn btn-small btn-secondary close-btn" @click="closeModal">
+            ×
+          </button>
+        </div>
 
         <div class="form-grid">
-          <input v-model="form.name" placeholder="地點名稱" />
-          <input v-model="form.address" placeholder="地址，導航會優先用這個" />
-          <input v-model="form.imageUrl" placeholder="圖片網址" />
-          <textarea v-model="form.description" placeholder="介紹" />
+          <div>
+            <label>地點名稱</label>
+            <input v-model="form.name" placeholder="例如：某某咖啡廳" />
+          </div>
+
+          <div>
+            <label>地址</label>
+            <input v-model="form.address" placeholder="地址，導航會優先用這個" />
+          </div>
+
+          <div>
+            <label>圖片網址</label>
+            <input v-model="form.imageUrl" placeholder="可留空，不使用預設圖片" />
+          </div>
+
+          <div>
+            <label>介紹</label>
+            <textarea v-model="form.description" placeholder="簡單寫一下這個地點的特色" />
+          </div>
         </div>
 
         <div class="modal-actions">
-          <button class="action-btn blue" type="button" @click="savePlace">
-            {{ editingId ? '更新' : '新增' }}
+          <button class="btn" type="button" @click="savePlace">
+            {{ editingId ? '更新地點' : '新增地點' }}
           </button>
 
-          <button class="action-btn" type="button" @click="closeModal">
+          <button class="btn btn-secondary" type="button" @click="closeModal">
             取消
           </button>
         </div>
@@ -144,7 +219,6 @@ const makePlaceKey = (place) => {
 const buildGoogleMapsUrl = (place) => {
   const address = String(place.address || '').trim()
   const name = String(place.name || place.merchantName || '').trim()
-
   const queryText = address || name
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryText)}`
@@ -410,40 +484,31 @@ onMounted(() => {
 
 <style scoped>
 .pocket-page {
-  min-height: 100vh;
-  background: #f4f7fb;
-  padding: 20px;
+  max-width: 860px;
+  margin: 0 auto;
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-start;
+  gap: 16px;
 }
 
 .eyebrow {
-  color: #2563eb;
-  font-size: 13px;
-  font-weight: bold;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #9b7b00;
+}
+
+.add-btn {
+  white-space: nowrap;
 }
 
 .search-box {
-  margin-bottom: 20px;
-}
-
-.search-box input,
-input,
-textarea {
-  width: 100%;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid #ddd;
-  box-sizing: border-box;
-}
-
-textarea {
-  min-height: 100px;
+  margin-bottom: 18px;
 }
 
 .place-list {
@@ -454,111 +519,177 @@ textarea {
 
 .place-card {
   overflow: hidden;
-  border-radius: 24px;
-  background: white;
+  padding: 0;
 }
 
 .cover {
   width: 100%;
   height: 220px;
   object-fit: cover;
+  display: block;
+  border-bottom: 2px solid #1e1e1e;
 }
 
 .content {
-  padding: 20px;
+  padding: 18px;
+}
+
+.place-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.place-title-row h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 900;
 }
 
 .address {
-  color: #6b7280;
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 .description {
-  margin-top: 12px;
-  color: #374151;
+  margin: 14px 0 0;
+  color: #333;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.7;
 }
 
 .action-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 18px;
+  width: 100%;
 }
 
-.action-btn,
-.add-btn {
-  border: none;
-  border-radius: 14px;
-  padding: 12px;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-  background: #374151;
-}
+.action-btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 74px;
+  padding: 10px 6px;
 
-.blue {
-  background: #2563eb;
-}
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
 
-.green {
-  background: #059669;
-}
-
-.red {
-  background: #dc2626;
-}
-
-.purple {
-  background: #7c3aed;
-}
-
-.empty {
   text-align: center;
-  color: #6b7280;
-  padding: 40px;
+  line-height: 1.2;
+}
+
+.action-btn span {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.action-btn small {
+  font-size: 12px;
+  font-weight: 800;
+  color: #333;
+}
+
+.btn-yellow {
+  background: var(--primary);
 }
 
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, .45);
+  background: rgba(30, 30, 30, 0.45);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 999;
+  padding: 18px;
 }
 
 .modal-card {
-  width: 92%;
-  max-width: 520px;
-  background: white;
-  border-radius: 24px;
-  padding: 24px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.close-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex: 0 0 44px;
 }
 
 .form-grid {
   display: grid;
-  gap: 12px;
+  gap: 4px;
 }
 
 .modal-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 @media (max-width: 768px) {
-  .action-grid {
-    grid-template-columns: 1fr;
+  .pocket-page {
+    max-width: 100%;
   }
 
-  .header {
+  .page-header {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
   }
 
   .add-btn {
     width: 100%;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .action-btn {
+    min-height: 66px;
+    padding: 8px 4px;
+  }
+
+  .action-btn span {
+    font-size: 14px;
+  }
+
+  .action-btn small {
+    font-size: 11px;
+  }
+
+  .place-title-row {
+    flex-direction: column;
+  }
+
+  .modal-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>
