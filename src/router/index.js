@@ -18,6 +18,7 @@ import ContactDetailView from '@/views/ContactDetailView.vue'
 
 // 生活套版
 import LifeTemplateListView from '@/views/LifeTemplateListView.vue'
+import LifeTemplateCreateView from '@/views/LifeTemplateCreateView.vue'
 import LifeTemplateDetailView from '@/views/LifeTemplateDetailView.vue'
 
 // 多人副本
@@ -53,18 +54,26 @@ const routes = [
 
   { path: '/contacts', name: 'contacts', component: ContactListView },
   { path: '/contacts/new', name: 'contact-new', component: ContactFormView },
-  { path: '/contacts/:id', name: 'contact-detail', component: ContactDetailView, props: true },
   { path: '/contacts/:id/edit', name: 'contact-edit', component: ContactFormView, props: true },
+  { path: '/contacts/:id', name: 'contact-detail', component: ContactDetailView, props: true },
 
   { path: '/life-templates', name: 'life-templates', component: LifeTemplateListView },
-  { path: '/life-templates/:id', name: 'life-template-detail', component: LifeTemplateDetailView, props: true },
+  {
+    path: '/life-templates/create',
+    name: 'life-template-create',
+    component: LifeTemplateCreateView,
+  },
+  {
+    path: '/life-templates/:id',
+    name: 'life-template-detail',
+    component: LifeTemplateDetailView,
+    props: true,
+  },
 
   { path: '/pocket-places', name: 'pocket-places', component: PocketPlaceView },
 
-  // 探店媒合：客戶頁
   { path: '/explore-shops', name: 'explore-shops', component: ExploreShopView },
 
-  // 商家端：獨立網址，不從入口登入
   { path: '/merchant/login', name: 'merchant-login', component: MerchantLoginView, meta: { public: true } },
   { path: '/merchant/coupons', name: 'merchant-coupons', component: MerchantCouponView, meta: { public: true } },
 
