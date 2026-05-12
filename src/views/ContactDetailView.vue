@@ -177,13 +177,16 @@ onMounted(() => {
   margin: 0 auto;
 }
 
+/* =========================
+   主卡片
+========================= */
+
 .hero-card {
   overflow: hidden;
 }
 
 .hero-top {
   display: flex;
-
   gap: 16px;
 }
 
@@ -193,38 +196,35 @@ onMounted(() => {
 
   flex: 0 0 84px;
 
-  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   background: #fff1a8;
 
-  border:
-    2px solid #1e1e1e;
-
-  display: flex;
-
-  align-items: center;
-  justify-content: center;
+  border: 2px solid #1e1e1e;
+  border-radius: 24px;
 
   font-size: 34px;
   font-weight: 900;
 
-  box-shadow:
-    0 5px 0 #1e1e1e;
+  box-shadow: 0 5px 0 #1e1e1e;
 }
 
 .hero-info {
   flex: 1;
+  min-width: 0;
 }
 
 .eyebrow {
   margin: 0 0 6px;
 
+  color: #9b7b00;
+
   font-size: 12px;
   font-weight: 900;
 
   letter-spacing: 2px;
-
-  color: #9b7b00;
 }
 
 .hero-info h1 {
@@ -245,14 +245,16 @@ onMounted(() => {
   line-height: 1.7;
 }
 
+/* =========================
+   資訊區
+========================= */
+
 .info-box {
   margin-top: 18px;
 
   background: #fff8e8;
 
-  border:
-    2px solid #1e1e1e;
-
+  border: 2px solid #1e1e1e;
   border-radius: 18px;
 
   padding: 16px;
@@ -268,7 +270,6 @@ onMounted(() => {
 .info-list {
   display: flex;
   flex-direction: column;
-
   gap: 10px;
 }
 
@@ -282,18 +283,25 @@ onMounted(() => {
 }
 
 /* =========================
-   橫3按鈕
+   按鈕區：固定橫三
 ========================= */
 
 .action-grid {
   display: grid;
 
-  grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 
   gap: 10px;
 
   margin-top: 20px;
+
+  width: 100%;
+}
+
+.action-grid button,
+.action-grid .btn {
+  width: 100%;
+  min-width: 0;
 }
 
 .action-btn {
@@ -302,15 +310,15 @@ onMounted(() => {
   padding: 10px 6px;
 
   display: flex;
-
   flex-direction: column;
-
   align-items: center;
   justify-content: center;
 
   gap: 4px;
 
   text-align: center;
+
+  border-radius: 18px;
 }
 
 .action-btn span {
@@ -319,11 +327,63 @@ onMounted(() => {
 }
 
 .action-btn small {
-  font-size: 12px;
-  font-weight: 800;
-
   color: #333;
+
+  font-size: 11px;
+  font-weight: 800;
 }
+
+/* =========================
+   按鈕顏色
+========================= */
+
+.btn-blue {
+  background: #bfe3ff;
+}
+
+.btn-green {
+  background: #c8ffd8;
+}
+
+.btn-purple {
+  background: #e2d4ff;
+}
+
+.btn-yellow {
+  background: #fff1a8;
+}
+
+.btn-red {
+  background: #ffc9c9;
+}
+
+.btn-secondary {
+  background: #ececec;
+}
+
+/* =========================
+   其他
+========================= */
+
+.empty {
+  text-align: center;
+
+  padding: 40px 0;
+
+  color: #666;
+
+  font-size: 15px;
+  font-weight: 800;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================
+   手機版
+========================= */
 
 @media (max-width: 768px) {
   .contact-detail-page {
@@ -335,9 +395,7 @@ onMounted(() => {
   }
 
   .action-grid {
-    grid-template-columns:
-      repeat(3, minmax(0, 1fr));
-
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -352,7 +410,7 @@ onMounted(() => {
   }
 
   .action-btn small {
-    font-size: 11px;
+    font-size: 10px;
   }
 }
 </style>

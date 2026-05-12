@@ -229,9 +229,15 @@ onMounted(() => {
   margin: 0 auto;
 }
 
+/* =========================
+   Header
+========================= */
+
 .page-header {
   display: flex;
+
   justify-content: space-between;
+
   align-items: flex-start;
 
   gap: 16px;
@@ -283,8 +289,7 @@ onMounted(() => {
 
   background: #fff1a8;
 
-  border:
-    2px solid #1e1e1e;
+  border: 2px solid #1e1e1e;
 
   display: flex;
 
@@ -294,12 +299,12 @@ onMounted(() => {
   font-size: 28px;
   font-weight: 900;
 
-  box-shadow:
-    0 5px 0 #1e1e1e;
+  box-shadow: 0 5px 0 #1e1e1e;
 }
 
 .contact-info {
   flex: 1;
+  min-width: 0;
 }
 
 .name-row {
@@ -347,8 +352,7 @@ onMounted(() => {
 
   background: #fff8e8;
 
-  border:
-    2px solid #1e1e1e;
+  border: 2px solid #1e1e1e;
 
   border-radius: 16px;
 
@@ -377,10 +381,13 @@ onMounted(() => {
   width: 100%;
 }
 
-.action-btn {
+.action-grid button,
+.action-grid .btn {
   width: 100%;
   min-width: 0;
+}
 
+.action-btn {
   min-height: 72px;
 
   padding: 10px 6px;
@@ -395,6 +402,8 @@ onMounted(() => {
   gap: 4px;
 
   text-align: center;
+
+  border-radius: 18px;
 }
 
 .action-btn span {
@@ -403,11 +412,43 @@ onMounted(() => {
 }
 
 .action-btn small {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 
   color: #333;
 }
+
+/* =========================
+   彩色按鈕
+========================= */
+
+.btn-blue {
+  background: #bfe3ff;
+}
+
+.btn-green {
+  background: #c8ffd8;
+}
+
+.btn-purple {
+  background: #e2d4ff;
+}
+
+.btn-yellow {
+  background: #fff1a8;
+}
+
+.btn-red {
+  background: #ffc9c9;
+}
+
+.btn-secondary {
+  background: #ececec;
+}
+
+/* =========================
+   Empty
+========================= */
 
 .empty {
   text-align: center;
@@ -419,6 +460,19 @@ onMounted(() => {
   font-size: 15px;
   font-weight: 800;
 }
+
+/* =========================
+   狀態
+========================= */
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================
+   手機版
+========================= */
 
 @media (max-width: 768px) {
   .contact-page {
@@ -459,7 +513,7 @@ onMounted(() => {
   }
 
   .action-btn small {
-    font-size: 11px;
+    font-size: 10px;
   }
 }
 </style>

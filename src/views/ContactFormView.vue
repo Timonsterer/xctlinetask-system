@@ -286,6 +286,10 @@ onMounted(() => {
   margin: 0 auto;
 }
 
+/* =========================
+   Header
+========================= */
+
 .page-header {
   display: flex;
 
@@ -309,24 +313,63 @@ onMounted(() => {
   color: #9b7b00;
 }
 
+/* =========================
+   表單卡片
+========================= */
+
 .form-card {
   overflow: hidden;
 }
 
 .form-grid {
   display: grid;
-
   gap: 8px;
 }
 
+label {
+  margin-top: 6px;
+
+  font-size: 14px;
+  font-weight: 900;
+
+  color: #333;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+
+  box-sizing: border-box;
+
+  border: 2px solid #1e1e1e;
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  padding: 14px;
+
+  font-size: 15px;
+  font-weight: 700;
+
+  color: #222;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* =========================
+   開關區
+========================= */
+
 .switch-box {
-  margin-top: 12px;
+  margin-top: 14px;
 
   background: #fff8e8;
 
-  border:
-    2px solid #1e1e1e;
-
+  border: 2px solid #1e1e1e;
   border-radius: 18px;
 
   padding: 14px;
@@ -385,6 +428,14 @@ onMounted(() => {
   gap: 10px;
 
   margin-top: 20px;
+
+  width: 100%;
+}
+
+.action-grid button,
+.action-grid .btn {
+  width: 100%;
+  min-width: 0;
 }
 
 .action-btn {
@@ -402,6 +453,8 @@ onMounted(() => {
   gap: 4px;
 
   text-align: center;
+
+  border-radius: 18px;
 }
 
 .action-btn span {
@@ -410,20 +463,50 @@ onMounted(() => {
 }
 
 .action-btn small {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 
   color: #333;
 }
+
+/* =========================
+   按鈕顏色
+========================= */
+
+.btn-blue {
+  background: #bfe3ff;
+}
+
+.btn-green {
+  background: #c8ffd8;
+}
+
+.btn-purple {
+  background: #e2d4ff;
+}
+
+.btn-yellow {
+  background: #fff1a8;
+}
+
+.btn-red {
+  background: #ffc9c9;
+}
+
+.btn-secondary {
+  background: #ececec;
+}
+
+/* =========================
+   預覽區
+========================= */
 
 .preview-box {
   margin-top: 20px;
 
   background: #fff8e8;
 
-  border:
-    2px solid #1e1e1e;
-
+  border: 2px solid #1e1e1e;
   border-radius: 18px;
 
   padding: 16px;
@@ -446,6 +529,30 @@ onMounted(() => {
 
   line-height: 1.7;
 }
+
+/* =========================
+   其他
+========================= */
+
+.empty {
+  text-align: center;
+
+  padding: 40px 0;
+
+  color: #666;
+
+  font-size: 15px;
+  font-weight: 800;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================
+   手機版
+========================= */
 
 @media (max-width: 768px) {
   .contact-form-page {
@@ -478,7 +585,7 @@ onMounted(() => {
   }
 
   .action-btn small {
-    font-size: 11px;
+    font-size: 10px;
   }
 }
 </style>
