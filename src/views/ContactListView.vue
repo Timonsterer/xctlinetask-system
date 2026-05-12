@@ -224,187 +224,242 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.contact-list-page {
-  max-width: 1080px;
+.contact-page {
+  max-width: 920px;
   margin: 0 auto;
-  padding: 20px;
-  color: #1f2937;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+
   gap: 16px;
-  margin-bottom: 20px;
 }
 
-.page-header h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
+.eyebrow {
+  margin: 0 0 6px;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  letter-spacing: 2px;
+
+  color: #9b7b00;
 }
 
-.page-header p {
-  margin: 0;
-  color: #6b7280;
+.filter-box {
+  margin-bottom: 18px;
 }
 
-.add-btn,
-.refresh-btn,
-.card-actions button {
-  border: none;
-  border-radius: 12px;
-  padding: 12px 14px;
-  cursor: pointer;
-  font-size: 14px;
-}
+/* =========================
+   聯絡人列表
+========================= */
 
-.add-btn,
-.refresh-btn {
-  background: #111827;
-  color: #fff;
-}
+.contact-list {
+  display: flex;
+  flex-direction: column;
 
-.add-btn:disabled,
-.refresh-btn:disabled,
-.card-actions button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.toolbar {
-  display: grid;
-  grid-template-columns: 1.4fr 200px 140px;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.search-input,
-.sort-select {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.error-msg,
-.success-msg {
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  border-radius: 12px;
-}
-
-.error-msg {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.success-msg {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.state-box {
-  padding: 28px;
-  text-align: center;
-  background: #f9fafb;
-  border: 1px dashed #d1d5db;
-  border-radius: 16px;
-}
-
-.contact-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+  gap: 18px;
 }
 
 .contact-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  padding: 16px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
 }
 
-.card-top {
+.contact-top {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
+
+  gap: 14px;
 }
 
 .avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  color: #111827;
+  width: 68px;
+  height: 68px;
+
+  flex: 0 0 68px;
+
+  border-radius: 20px;
+
+  background: #fff1a8;
+
+  border:
+    2px solid #1e1e1e;
+
   display: flex;
+
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  font-weight: 700;
-  flex-shrink: 0;
+
+  font-size: 28px;
+  font-weight: 900;
+
+  box-shadow:
+    0 5px 0 #1e1e1e;
 }
 
-.title-wrap h3 {
-  margin: 0 0 4px;
-  font-size: 18px;
+.contact-info {
+  flex: 1;
 }
 
-.sub-text {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.card-body p {
-  margin: 0 0 8px;
-  line-height: 1.5;
-  word-break: break-word;
-}
-
-.time-text {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.card-actions {
+.name-row {
   display: flex;
-  gap: 8px;
-  margin-top: 14px;
+
+  justify-content: space-between;
+
+  align-items: flex-start;
+
+  gap: 10px;
+}
+
+.name-row h2 {
+  margin: 0;
+
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.contact-title {
+  margin: 10px 0 0;
+
+  font-size: 15px;
+  font-weight: 800;
+
+  color: #333;
+}
+
+.contact-meta {
+  margin-top: 10px;
+
+  display: flex;
   flex-wrap: wrap;
+
+  gap: 10px;
+
+  color: #666;
+
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.detail-btn {
-  background: #111827;
-  color: #fff;
+.note-box {
+  margin-top: 16px;
+
+  background: #fff8e8;
+
+  border:
+    2px solid #1e1e1e;
+
+  border-radius: 16px;
+
+  padding: 14px;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  line-height: 1.7;
 }
 
-.edit-btn {
-  background: #2563eb;
-  color: #fff;
+/* =========================
+   橫3按鈕
+========================= */
+
+.action-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-top: 18px;
+
+  width: 100%;
 }
 
-.delete-btn {
-  background: #dc2626;
-  color: #fff;
+.action-btn {
+  width: 100%;
+  min-width: 0;
+
+  min-height: 72px;
+
+  padding: 10px 6px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 4px;
+
+  text-align: center;
+}
+
+.action-btn span {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.action-btn small {
+  font-size: 12px;
+  font-weight: 800;
+
+  color: #333;
+}
+
+.empty {
+  text-align: center;
+
+  padding: 40px 0;
+
+  color: #666;
+
+  font-size: 15px;
+  font-weight: 800;
 }
 
 @media (max-width: 768px) {
+  .contact-page {
+    max-width: 100%;
+  }
+
   .page-header {
     flex-direction: column;
-    align-items: stretch;
   }
 
-  .toolbar {
-    grid-template-columns: 1fr;
+  .page-header button {
+    width: 100%;
   }
 
-  .contact-grid {
-    grid-template-columns: 1fr;
+  .contact-top {
+    flex-direction: column;
+  }
+
+  .name-row {
+    flex-direction: column;
+  }
+
+  .action-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  .action-btn {
+    min-height: 66px;
+
+    padding: 8px 4px;
+  }
+
+  .action-btn span {
+    font-size: 14px;
+  }
+
+  .action-btn small {
+    font-size: 11px;
   }
 }
 </style>

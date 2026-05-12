@@ -173,147 +173,186 @@ onMounted(() => {
 
 <style scoped>
 .contact-detail-page {
-  max-width: 860px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: 20px;
-  color: #1f2937;
 }
 
-.page-header {
+.hero-card {
+  overflow: hidden;
+}
+
+.hero-top {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
 
-.page-header h1 {
-  margin: 0 0 6px;
-  font-size: 26px;
-}
-
-.page-header p {
-  margin: 0;
-  color: #6b7280;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.back-btn,
-.edit-btn,
-.delete-btn,
-.info-item button {
-  border: none;
-  border-radius: 12px;
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.back-btn {
-  background: #e5e7eb;
-}
-
-.edit-btn {
-  background: #2563eb;
-  color: #fff;
-}
-
-.delete-btn {
-  background: #dc2626;
-  color: #fff;
-}
-
-.state-box {
-  padding: 30px;
-  text-align: center;
-  background: #f9fafb;
-  border-radius: 16px;
-}
-
-.detail-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 20px;
-  padding: 20px;
-}
-
-.top-block {
-  display: flex;
-  align-items: center;
   gap: 16px;
-  margin-bottom: 20px;
 }
 
 .avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 999px;
-  background: #e5e7eb;
+  width: 84px;
+  height: 84px;
+
+  flex: 0 0 84px;
+
+  border-radius: 24px;
+
+  background: #fff1a8;
+
+  border:
+    2px solid #1e1e1e;
+
   display: flex;
+
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  font-weight: 700;
+
+  font-size: 34px;
+  font-weight: 900;
+
+  box-shadow:
+    0 5px 0 #1e1e1e;
 }
 
-.title-wrap h2 {
+.hero-info {
+  flex: 1;
+}
+
+.eyebrow {
   margin: 0 0 6px;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  letter-spacing: 2px;
+
+  color: #9b7b00;
 }
 
-.sub-text {
+.hero-info h1 {
   margin: 0;
-  color: #6b7280;
+
+  font-size: 28px;
+  font-weight: 900;
 }
 
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+.hero-sub {
+  margin-top: 10px;
+
+  color: #444;
+
+  font-size: 15px;
+  font-weight: 700;
+
+  line-height: 1.7;
+}
+
+.info-box {
+  margin-top: 18px;
+
+  background: #fff8e8;
+
+  border:
+    2px solid #1e1e1e;
+
+  border-radius: 18px;
+
+  padding: 16px;
+}
+
+.info-box h2 {
+  margin: 0 0 12px;
+
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
 }
 
 .info-item {
-  background: #f9fafb;
-  padding: 14px;
-  border-radius: 14px;
+  color: #555;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  line-height: 1.6;
 }
 
-.info-item span {
-  font-size: 13px;
-  color: #6b7280;
-}
+/* =========================
+   橫3按鈕
+========================= */
 
-.info-item p {
-  margin: 6px 0 10px;
-  word-break: break-word;
-}
+.action-grid {
+  display: grid;
 
-.info-item button {
-  background: #111827;
-  color: #fff;
-}
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
 
-.full {
-  grid-column: 1 / -1;
-}
+  gap: 10px;
 
-.bottom-actions {
   margin-top: 20px;
+}
+
+.action-btn {
+  min-height: 72px;
+
+  padding: 10px 6px;
+
   display: flex;
-  justify-content: flex-end;
+
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 4px;
+
+  text-align: center;
+}
+
+.action-btn span {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.action-btn small {
+  font-size: 12px;
+  font-weight: 800;
+
+  color: #333;
 }
 
 @media (max-width: 768px) {
-  .info-grid {
-    grid-template-columns: 1fr;
+  .contact-detail-page {
+    max-width: 100%;
   }
 
-  .page-header {
+  .hero-top {
     flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+  }
+
+  .action-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  .action-btn {
+    min-height: 66px;
+
+    padding: 8px 4px;
+  }
+
+  .action-btn span {
+    font-size: 14px;
+  }
+
+  .action-btn small {
+    font-size: 11px;
   }
 }
 </style>

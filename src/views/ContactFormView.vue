@@ -281,82 +281,204 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.contact-page {
-  min-height: 100vh;
-  background: #f4f7fb;
-  padding: 20px;
+.contact-form-page {
+  max-width: 760px;
+  margin: 0 auto;
 }
 
-.header {
-  margin-bottom: 20px;
+.page-header {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: flex-start;
+
+  gap: 16px;
+
+  margin-bottom: 18px;
 }
 
 .eyebrow {
-  color: #2563eb;
-  font-size: 13px;
-  font-weight: bold;
+  margin: 0 0 6px;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  letter-spacing: 2px;
+
+  color: #9b7b00;
 }
 
-.card {
-  background: white;
-  border-radius: 24px;
-  padding: 20px;
+.form-card {
+  overflow: hidden;
 }
 
 .form-grid {
   display: grid;
-  gap: 14px;
+
+  gap: 8px;
 }
 
-input,
-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid #ddd;
-  border-radius: 14px;
+.switch-box {
+  margin-top: 12px;
+
+  background: #fff8e8;
+
+  border:
+    2px solid #1e1e1e;
+
+  border-radius: 18px;
+
   padding: 14px;
-  font-size: 15px;
 }
 
-textarea {
-  min-height: 120px;
-}
+.switch-row {
+  display: flex;
 
-.button-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+
+  align-items: flex-start;
+}
+
+.switch-row input {
+  width: 22px;
+  height: 22px;
+
+  flex: 0 0 22px;
+
+  margin: 2px 0 0;
+
+  padding: 0;
+
+  accent-color: #ffd84d;
+}
+
+.switch-row span {
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+}
+
+.switch-row strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.switch-row small {
+  color: #666;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* =========================
+   橫3按鈕
+========================= */
+
+.action-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 10px;
+
   margin-top: 20px;
 }
 
-.btn {
-  border: none;
-  border-radius: 14px;
-  padding: 14px;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
+.action-btn {
+  min-height: 72px;
+
+  padding: 10px 6px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+  align-items: center;
+
+  gap: 4px;
+
+  text-align: center;
 }
 
-.btn:disabled {
-  opacity: 0.6;
+.action-btn span {
+  font-size: 15px;
+  font-weight: 900;
 }
 
-.blue {
-  background: #2563eb;
+.action-btn small {
+  font-size: 12px;
+  font-weight: 800;
+
+  color: #333;
 }
 
-.green {
-  background: #059669;
+.preview-box {
+  margin-top: 20px;
+
+  background: #fff8e8;
+
+  border:
+    2px solid #1e1e1e;
+
+  border-radius: 18px;
+
+  padding: 16px;
 }
 
-.purple {
-  background: #7c3aed;
+.preview-box h3 {
+  margin: 0 0 10px;
+
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.preview-box p {
+  margin: 0;
+
+  color: #555;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  line-height: 1.7;
 }
 
 @media (max-width: 768px) {
-  .button-grid {
-    grid-template-columns: 1fr;
+  .contact-form-page {
+    max-width: 100%;
+  }
+
+  .page-header {
+    flex-direction: column;
+  }
+
+  .page-header button {
+    width: 100%;
+  }
+
+  .action-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  .action-btn {
+    min-height: 66px;
+
+    padding: 8px 4px;
+  }
+
+  .action-btn span {
+    font-size: 14px;
+  }
+
+  .action-btn small {
+    font-size: 11px;
   }
 }
 </style>
