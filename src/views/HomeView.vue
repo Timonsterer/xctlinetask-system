@@ -236,7 +236,7 @@ onMounted(() => {
 
 <style scoped>
 .home-page {
-  max-width: 860px;
+  max-width: 920px;
   margin: 0 auto;
 }
 
@@ -249,9 +249,12 @@ onMounted(() => {
 
 .eyebrow {
   margin: 0 0 4px;
+
   font-size: 12px;
   font-weight: 900;
+
   letter-spacing: 2px;
+
   color: #8a6d00;
 }
 
@@ -271,39 +274,80 @@ onMounted(() => {
   margin-top: 24px;
 }
 
+/* =========================
+   改成橫3
+========================= */
+
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 12px;
 }
+
+/* =========================
+   功能卡
+========================= */
 
 .menu-card {
   width: 100%;
-  min-height: 120px;
-  padding: 16px;
-  text-align: left;
+
+  min-height: 96px;
+
+  padding: 12px 10px;
+
+  text-align: center;
 
   display: flex;
+
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  border-radius: 20px;
 }
 
-.menu-card strong {
-  font-size: 17px;
-  font-weight: 900;
+/* icon */
+
+.menu-card .icon {
+  width: 34px;
+  height: 34px;
+
+  font-size: 14px;
 }
+
+/* 標題 */
+
+.menu-card strong {
+  font-size: 14px;
+  font-weight: 900;
+
+  line-height: 1.2;
+}
+
+/* 副標 */
 
 .menu-card small {
   color: #333;
-  font-size: 13px;
+
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.5;
+
+  line-height: 1.3;
 }
 
+/* 滿版按鈕 */
+
 .full {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
+
+/* 顏色 */
 
 .btn-yellow {
   background: var(--primary);
@@ -317,9 +361,13 @@ onMounted(() => {
   background: #b8f3e8;
 }
 
-@media (max-width: 600px) {
+/* =========================
+   手機版
+========================= */
+
+@media (max-width: 768px) {
   .home-page {
-    max-width: none;
+    max-width: 100%;
   }
 
   .hero-top {
@@ -327,11 +375,33 @@ onMounted(() => {
   }
 
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+
+    gap: 8px;
   }
 
-  .full {
-    grid-column: auto;
+  .menu-card {
+    min-height: 88px;
+
+    padding: 10px 6px;
+
+    border-radius: 18px;
+  }
+
+  .menu-card strong {
+    font-size: 12px;
+  }
+
+  .menu-card small {
+    font-size: 10px;
+  }
+
+  .menu-card .icon {
+    width: 30px;
+    height: 30px;
+
+    font-size: 12px;
   }
 }
 </style>
