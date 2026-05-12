@@ -331,185 +331,272 @@ onMounted(loadRaids)
 </script>
 
 <style scoped>
-.page {
-  padding: 20px;
-  max-width: 760px;
+.raid-page {
+  max-width: 920px;
   margin: 0 auto;
-  background: #f8fafc;
-  min-height: 100vh;
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  letter-spacing: 2px;
+
+  color: #9b7b00;
+}
+
+.filter-box {
   margin-bottom: 18px;
 }
 
-.header h1 {
-  margin: 0;
-  font-size: 30px;
-}
+/* =========================
+   副本列表
+========================= */
 
-.header p {
-  margin: 6px 0 0;
-  color: #64748b;
-}
-
-.create-card,
-.card {
-  background: #fff;
-  border-radius: 18px;
-  padding: 18px;
-  margin-bottom: 14px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-}
-
-.create-card h2 {
-  margin: 0 0 12px;
-}
-
-.input,
-.textarea {
-  width: 100%;
-  box-sizing: border-box;
-  margin-bottom: 10px;
-  padding: 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  font-size: 15px;
-}
-
-.textarea {
-  min-height: 86px;
-  resize: vertical;
-}
-
-.list {
+.raid-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
-.card-head {
+.raid-card {
+  overflow: hidden;
+}
+
+.raid-cover {
+  width: 100%;
+  height: 220px;
+
+  object-fit: cover;
+
+  display: block;
+
+  border-bottom:
+    2px solid #1e1e1e;
+}
+
+.raid-content {
+  padding: 18px;
+}
+
+.raid-top {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  align-items: flex-start;
+
+  gap: 12px;
 }
 
-.card h2 {
-  margin: 0 0 8px;
+.raid-top h2 {
+  margin: 0 0 6px;
+
+  font-size: 24px;
+  font-weight: 900;
 }
 
-.status {
-  height: fit-content;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: #dcfce7;
-  color: #166534;
-  font-size: 13px;
+.raid-desc {
+  margin: 14px 0 0;
+
+  color: #444;
+
+  font-size: 15px;
   font-weight: 700;
-}
 
-.desc {
-  margin: 6px 0;
-  color: #475569;
-}
-
-.empty {
-  text-align: center;
-  color: #64748b;
-}
-
-.contact-box {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 14px;
-  background: #eef2ff;
-  color: #1e3a8a;
   line-height: 1.7;
 }
 
-.contact-title,
-.joined-title {
-  font-weight: 800;
-  margin-bottom: 6px;
-}
+.location {
+  margin-top: 10px;
 
-.joined-list {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 14px;
-  background: #f1f5f9;
-}
+  color: #666;
 
-.joined-user {
-  padding: 8px 0;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.joined-user:last-child {
-  border-bottom: none;
-}
-
-.joined-contact {
-  margin-top: 4px;
-  color: #2563eb;
   font-size: 14px;
-}
-
-.owner-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.btn {
-  width: 100%;
-  margin-top: 12px;
-  padding: 12px;
-  border: none;
-  border-radius: 12px;
-  background: #111827;
-  color: white;
-  font-size: 16px;
   font-weight: 700;
-  cursor: pointer;
 }
 
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.member-box {
+  margin-top: 14px;
+
+  background: #fff8e8;
+
+  border:
+    2px solid #1e1e1e;
+
+  border-radius: 16px;
+
+  padding: 14px;
 }
 
-.btn.secondary {
-  width: auto;
-  margin-top: 0;
-  background: #e5e7eb;
-  color: #111827;
+.member-title {
+  font-size: 14px;
+  font-weight: 900;
+
+  margin-bottom: 10px;
 }
 
-.btn.warning {
-  background: #f59e0b;
+.member-list {
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 8px;
 }
 
-.btn.danger {
-  background: #dc2626;
+.member-chip {
+  background: #ffffff;
+
+  border:
+    2px solid #1e1e1e;
+
+  border-radius: 999px;
+
+  padding: 6px 10px;
+
+  font-size: 12px;
+  font-weight: 800;
 }
 
-.btn.joined {
-  background: #94a3b8;
+/* =========================
+   狀態
+========================= */
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 8px;
+
+  margin-top: 14px;
 }
 
-@media (max-width: 560px) {
-  .header,
-  .owner-actions {
-    grid-template-columns: 1fr;
+/* =========================
+   橫3按鈕
+========================= */
+
+.action-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-top: 18px;
+
+  width: 100%;
+}
+
+.action-btn {
+  width: 100%;
+  min-width: 0;
+
+  min-height: 72px;
+
+  padding: 10px 6px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+  align-items: center;
+
+  gap: 4px;
+
+  text-align: center;
+}
+
+.action-btn span {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.action-btn small {
+  font-size: 12px;
+  font-weight: 800;
+
+  color: #333;
+}
+
+/* =========================
+   狀態色
+========================= */
+
+.btn-yellow {
+  background: var(--primary);
+}
+
+.btn-orange {
+  background: #ffd0a6;
+}
+
+.btn-teal {
+  background: #b8f3e8;
+}
+
+/* =========================
+   空狀態
+========================= */
+
+.empty {
+  text-align: center;
+
+  padding: 40px 0;
+
+  color: #666;
+
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* =========================
+   手機版
+========================= */
+
+@media (max-width: 768px) {
+  .raid-page {
+    max-width: 100%;
+  }
+
+  .page-header {
     flex-direction: column;
   }
 
-  .btn.secondary {
+  .page-header button {
     width: 100%;
+  }
+
+  .raid-top {
+    flex-direction: column;
+  }
+
+  .action-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  .action-btn {
+    min-height: 66px;
+
+    padding: 8px 4px;
+  }
+
+  .action-btn span {
+    font-size: 14px;
+  }
+
+  .action-btn small {
+    font-size: 11px;
   }
 }
 </style>

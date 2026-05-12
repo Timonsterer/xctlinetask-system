@@ -825,22 +825,45 @@ onMounted(() => {
 
 .eyebrow {
   margin: 0 0 6px;
+
   font-size: 12px;
   font-weight: 900;
+
   letter-spacing: 2px;
+
   color: #9b7b00;
 }
 
+/* =========================
+   首頁 / 新增任務
+   改成橫2
+========================= */
+
 .header-actions {
-  display: flex;
-  gap: 10px;
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 8px;
+
+  width: 220px;
+
   flex-shrink: 0;
 }
 
+/* =========================
+   週切換
+========================= */
+
 .week-toolbar {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+
+  grid-template-columns:
+    auto 1fr auto;
+
   align-items: center;
+
   gap: 12px;
 }
 
@@ -850,59 +873,93 @@ onMounted(() => {
 
 .week-title strong {
   display: block;
+
   font-size: 20px;
   font-weight: 900;
 }
 
 .week-title small {
   color: #666;
+
   font-size: 13px;
   font-weight: 800;
 }
 
+/* =========================
+   本週全部 / 未完成 / 已完成
+   改成橫3小卡
+========================= */
+
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 10px;
 }
 
 .stat-card {
   margin-bottom: 0;
+
+  padding: 14px 10px;
+
+  border-radius: 18px;
+
+  text-align: center;
 }
 
 .stat-card span {
   display: block;
+
   color: #666;
-  font-size: 13px;
+
+  font-size: 11px;
   font-weight: 800;
 }
 
 .stat-card strong {
   display: block;
-  margin-top: 6px;
-  font-size: 30px;
+
+  margin-top: 4px;
+
+  font-size: 22px;
   font-weight: 900;
 }
 
+/* =========================
+   搜尋與篩選
+========================= */
+
 .toolbar {
   display: grid;
-  grid-template-columns: 1fr 280px;
+
+  grid-template-columns:
+    1fr 280px;
+
   align-items: center;
+
   gap: 14px;
 }
 
 .filter-group {
   display: flex;
   flex-wrap: wrap;
+
   gap: 10px;
 }
 
 .chip {
   width: auto;
+
   min-width: 84px;
+
   background: #ffffff;
+
   border-radius: 999px;
+
   padding: 10px 14px;
+
   font-size: 14px;
 }
 
@@ -914,11 +971,20 @@ onMounted(() => {
   margin: 0;
 }
 
+/* =========================
+   alert
+========================= */
+
 .alert {
   margin-bottom: 14px;
+
   padding: 12px 14px;
-  border: 2px solid #1e1e1e;
+
+  border:
+    2px solid #1e1e1e;
+
   border-radius: 16px;
+
   font-size: 14px;
   font-weight: 800;
 }
@@ -933,46 +999,73 @@ onMounted(() => {
   color: #166534;
 }
 
+/* =========================
+   區塊 header
+========================= */
+
 .board-header {
   display: flex;
+
   justify-content: space-between;
+
   align-items: center;
+
   gap: 12px;
+
   margin-bottom: 14px;
 }
 
 .board-header h2 {
   margin: 0;
+
   font-size: 22px;
   font-weight: 900;
 }
 
 .board-header small {
   color: #666;
+
   font-size: 14px;
   font-weight: 800;
 }
 
+/* =========================
+   週排程
+========================= */
+
 .week-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(140px, 1fr));
+
+  grid-template-columns:
+    repeat(7, minmax(140px, 1fr));
+
   gap: 12px;
+
   overflow-x: auto;
+
   padding-bottom: 8px;
 }
 
 .day-card {
   min-width: 140px;
+
   background: #fff8e8;
-  border: 2px solid #1e1e1e;
+
+  border:
+    2px solid #1e1e1e;
+
   border-radius: 18px;
+
   padding: 12px;
 }
 
 .day-head {
   display: flex;
+
   justify-content: space-between;
+
   align-items: center;
+
   margin-bottom: 8px;
 }
 
@@ -983,22 +1076,31 @@ onMounted(() => {
 
 .day-head span {
   color: #666;
+
   font-size: 13px;
   font-weight: 800;
 }
 
 .period-box {
   background: #ffffff;
-  border: 2px solid #1e1e1e;
+
+  border:
+    2px solid #1e1e1e;
+
   border-radius: 16px;
+
   padding: 10px;
+
   margin-bottom: 10px;
 }
 
 .period-title {
   display: flex;
+
   flex-direction: column;
+
   gap: 2px;
+
   margin-bottom: 8px;
 }
 
@@ -1009,6 +1111,7 @@ onMounted(() => {
 
 .period-title small {
   color: #666;
+
   font-size: 11px;
   font-weight: 800;
 }
@@ -1016,16 +1119,24 @@ onMounted(() => {
 .period-list {
   display: flex;
   flex-direction: column;
+
   gap: 8px;
 }
 
 .mini-task {
   display: flex;
+
   justify-content: space-between;
+
   gap: 6px;
+
   background: #d8f8d8;
-  border: 2px solid #1e1e1e;
+
+  border:
+    2px solid #1e1e1e;
+
   border-radius: 12px;
+
   padding: 8px;
 }
 
@@ -1036,14 +1147,18 @@ onMounted(() => {
 
 .mini-task strong {
   display: block;
+
   font-size: 13px;
   font-weight: 900;
+
   line-height: 1.4;
 }
 
 .mini-task small {
   display: block;
+
   color: #555;
+
   font-size: 11px;
   font-weight: 800;
 }
@@ -1051,32 +1166,51 @@ onMounted(() => {
 .mini-done {
   width: 28px;
   height: 28px;
+
   flex: 0 0 28px;
+
   padding: 0;
+
   border-radius: 10px;
+
   font-size: 13px;
 }
 
 .empty-period {
   width: 100%;
+
   padding: 9px 6px;
+
   border-radius: 12px;
+
   background: #ffffff;
+
   color: #666;
+
   font-size: 13px;
+
   box-shadow: none;
 }
+
+/* =========================
+   任務列表
+========================= */
 
 .task-list {
   display: flex;
   flex-direction: column;
+
   gap: 14px;
 }
 
 .task-item {
   display: grid;
-  grid-template-columns: 1fr 260px;
+
+  grid-template-columns:
+    1fr 260px;
+
   gap: 14px;
+
   align-items: start;
 }
 
@@ -1086,43 +1220,63 @@ onMounted(() => {
 
 .task-top {
   display: flex;
+
   justify-content: space-between;
+
   gap: 10px;
 }
 
 .task-top h3 {
   margin: 0;
+
   font-size: 18px;
   font-weight: 900;
 }
 
 .task-meta {
   display: flex;
+
   flex-wrap: wrap;
+
   gap: 8px 12px;
+
   margin-top: 10px;
+
   color: #666;
+
   font-size: 13px;
   font-weight: 800;
 }
 
 .task-note {
   margin: 10px 0 0;
+
   color: #333;
+
   font-size: 14px;
   font-weight: 700;
+
   line-height: 1.6;
 }
 
+/* =========================
+   任務按鈕橫3
+========================= */
+
 .action-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
   gap: 8px;
 }
 
 .action-btn {
   min-width: 0;
+
   padding: 10px 6px;
+
   font-size: 13px;
 }
 
@@ -1130,6 +1284,10 @@ button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* =========================
+   平板
+========================= */
 
 @media (max-width: 900px) {
   .toolbar {
@@ -1141,18 +1299,26 @@ button:disabled {
   }
 
   .action-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
   }
 }
 
+/* =========================
+   手機
+========================= */
+
 @media (max-width: 640px) {
-  .page-header,
-  .header-actions {
+  .page-header {
     flex-direction: column;
-    width: 100%;
   }
 
-  .header-actions button {
+  .header-actions {
+    display: grid;
+
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
     width: 100%;
   }
 
@@ -1161,11 +1327,23 @@ button:disabled {
   }
 
   .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  .stat-card {
+    padding: 10px 6px;
+  }
+
+  .stat-card strong {
+    font-size: 18px;
   }
 
   .week-grid {
-    grid-template-columns: repeat(7, 150px);
+    grid-template-columns:
+      repeat(7, 150px);
   }
 }
 </style>
