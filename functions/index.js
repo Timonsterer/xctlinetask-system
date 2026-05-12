@@ -9,6 +9,8 @@ admin.initializeApp()
 
 const LINE_TOKEN = "aJdHrp9V8uX75wOOaTPriztvvAkoiqhNItewcdI/oPeQLfw02AVWgoRSx3HN8vcRqD0/jVbWIQ4+J6kaSXrqWu4viIn44060THxh5CRoxdsYshKERXv3RSAyycpcsHfnhiR5s3a64ZEJ1vs7L56z3QdB04t89/1O/w1cDnyilFU="
 const LIFF_URL = 'https://liff.line.me/2009690445-fzD5YF3K'
+const HOME_URL = `${LIFF_URL}`
+const RAID_URL = `${LIFF_URL}?page=raid`
 
 const db = admin.firestore()
 
@@ -27,6 +29,55 @@ async function pushLine(to, text) {
         'Content-Type': 'application/json',
       },
     }
+  )
+}
+
+function uniqueArray(arr) {
+  return [...new Set(arr.filter(Boolean))]
+}
+
+function getTaskTitle(task) {
+  return task.title || task.content || task.name || '未命名任務'
+}
+
+function getRaidTitle(raid) {
+  return raid.title || raid.name || raid.taskName || '未命名副本'
+}
+
+function getUserLineIdFromJoinedUser(user) {
+  if (!user) return ''
+
+  return (
+    user.lineUserId ||
+    user.userId ||
+    user.id ||
+    user.uid ||
+    ''
+  )
+}
+
+function getUserNameFromJoinedUser(user) {
+  if (!user) return '有人'
+
+  return (
+    user.userName ||
+    user.displayName ||
+    user.name ||
+    user.nickname ||
+    '有人'
+  )
+}
+
+function getJoinMessageFromUser(user) {
+  if (!user) return ''
+
+  return (
+    user.message ||
+    user.joinMessage ||
+    user.note ||
+    user.remark ||
+    user.memo ||
+    ''
   )
 }
 
@@ -54,6 +105,84 @@ exports.checkNoTaskOnce = onCall(
     )
 
     return { success: true, notified: false }
+  }
+)
+
+// ==========================
+// 當下 10 分鐘後有任務 → 任務提醒，只提醒一次
+// ==========================
+exports.remindTaskBefore10Minutes = onSchedule(
+  {
+    schedule: 'every 1 minutes',
+    region: 'asia-east1',
+    timeZone: 'Asia/Taipei',
+  },
+  async () => {
+    const now = new Date()
+    const from = new Date(now.getTime() + 9 * 60 * 1000)
+    const to = new Date(now.getTime() + 11 * 60 * 1000)
+
+    try {
+      const snap = await db
+        .collection('tasks')
+        .where('startAt', '>=', admin.firestore.Timestamp.fromDate(from))
+        .where('startAt', '<=', admin.firestore.Timestamp.fromDate(to))
+        .get()
+
+      if (snap.empty) {
+        logger.info('10分鐘任務提醒：沒有符合任務')
+        return
+      }
+
+      const jobs = []
+
+      snap.forEach((docSnap) => {
+        const task = docSnap.data()
+
+        if (!task) return
+        if (task.taskReminder10Sent === true) return
+        if (['done', 'completed', 'cancelled', 'canceled'].includes(task.status)) return
+
+        const lineUserId =
+          task.lineUserId ||
+          task.userId ||
+          task.ownerId ||
+          ''
+
+        if (!lineUserId) return
+
+        const title = getTaskTitle(task)
+
+        jobs.push(
+          pushLine(
+            lineUserId,
+            `任務提醒\n` +
+              `10 分鐘後有任務要執行\n\n` +
+              `任務：${title}\n\n` +
+              `👉 點這裡回到首頁：\n${HOME_URL}`
+          ).then(() =>
+            docSnap.ref.set(
+              {
+                taskReminder10Sent: true,
+                taskReminder10SentAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge: true }
+            )
+          )
+        )
+      })
+
+      await Promise.all(jobs)
+
+      logger.info('10分鐘任務提醒完成', {
+        count: jobs.length,
+      })
+    } catch (err) {
+      logger.error('10分鐘任務提醒失敗', {
+        message: err?.message,
+        response: err?.response?.data,
+      })
+    }
   }
 )
 
@@ -104,7 +233,7 @@ exports.onCouponCreated = onDocumentCreated(
         }
       })
 
-      const uniqueTargets = [...new Set(targets)]
+      const uniqueTargets = uniqueArray(targets)
 
       await Promise.all(
         uniqueTargets.map((lineUserId) =>
@@ -263,7 +392,7 @@ exports.onInviteStatusUpdated = onDocumentUpdated(
 )
 
 // ==========================
-// 多人副本：有人報名 / 額滿 → 通知建立者
+// 多人副本：有人報名 → 通知發起人與其他參與人
 // ==========================
 exports.onRaidUpdated = onDocumentUpdated(
   {
@@ -286,34 +415,66 @@ exports.onRaidUpdated = onDocumentUpdated(
     const afterCount = afterUsers.length
 
     if (afterCount <= beforeCount) return
-    if (!after.ownerId) return
 
     const requiredPeople = Number(after.requiredPeople || 1)
     const latestUser = afterUsers[afterUsers.length - 1] || {}
-    const latestName = latestUser.userName || latestUser.displayName || '有人'
+
+    const latestName = getUserNameFromJoinedUser(latestUser)
+    const latestUserId = getUserLineIdFromJoinedUser(latestUser)
+    const joinMessage = getJoinMessageFromUser(latestUser)
+    const raidTitle = getRaidTitle(after)
+
+    const ownerId =
+      after.ownerId ||
+      after.createdBy ||
+      after.userId ||
+      ''
+
+    const participantIds = afterUsers.map((user) => getUserLineIdFromJoinedUser(user))
+
+    const targets = uniqueArray([
+      ownerId,
+      ...participantIds,
+    ])
+
+    const messageText =
+      `多人副本有人報名\n` +
+      `副本：${raidTitle}\n` +
+      `報名者：${latestName}\n` +
+      `目前人數：${afterCount} / ${requiredPeople}` +
+      `${joinMessage ? `\n\n報名人訊息：${joinMessage}` : ''}\n\n` +
+      `👉 點這裡查看副本：\n${RAID_URL}`
 
     try {
-      await pushLine(
-        after.ownerId,
-        `多人副本有人報名\n` +
-          `任務：${after.title || '未命名任務'}\n` +
-          `報名者：${latestName}\n` +
-          `目前人數：${afterCount} / ${requiredPeople}\n\n` +
-          `👉 點這裡查看多人副本：\n${LIFF_URL}`
+      await Promise.all(
+        targets.map((lineUserId) =>
+          pushLine(lineUserId, messageText)
+        )
       )
 
       const updateData = {
         lastJoinPushSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastJoinUserId: latestUserId,
+        lastJoinUserName: latestName,
         joinedCount: afterCount,
       }
 
       if (afterCount >= requiredPeople && beforeCount < requiredPeople) {
-        await pushLine(
-          after.ownerId,
-          `多人副本已額滿\n` +
-            `任務：${after.title || '未命名任務'}\n` +
-            `人數：${afterCount} / ${requiredPeople}\n\n` +
-            `👉 點這裡查看多人副本：\n${LIFF_URL}`
+        const fullTargets = uniqueArray([
+          ownerId,
+          ...participantIds,
+        ])
+
+        await Promise.all(
+          fullTargets.map((lineUserId) =>
+            pushLine(
+              lineUserId,
+              `多人副本已額滿\n` +
+                `副本：${raidTitle}\n` +
+                `人數：${afterCount} / ${requiredPeople}\n\n` +
+                `👉 點這裡查看副本：\n${RAID_URL}`
+            )
+          )
         )
 
         updateData.status = 'full'
@@ -325,7 +486,8 @@ exports.onRaidUpdated = onDocumentUpdated(
 
       logger.info('多人副本通知成功', {
         raidId: event.params.id,
-        ownerId: after.ownerId,
+        ownerId,
+        targetCount: targets.length,
         beforeCount,
         afterCount,
       })
