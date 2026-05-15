@@ -392,7 +392,7 @@ exports.onInviteStatusUpdated = onDocumentUpdated(
 )
 
 // ==========================
-// 多人副本：有人報名 → 通知發起人與其他參與人
+// 多人副本：報名 / 額滿 / 編輯內容 → 最小幅度通知
 // ==========================
 exports.onRaidUpdated = onDocumentUpdated(
   {
@@ -414,14 +414,6 @@ exports.onRaidUpdated = onDocumentUpdated(
     const beforeCount = beforeUsers.length
     const afterCount = afterUsers.length
 
-    if (afterCount <= beforeCount) return
-
-    const requiredPeople = Number(after.requiredPeople || 1)
-    const latestUser = afterUsers[afterUsers.length - 1] || {}
-
-    const latestName = getUserNameFromJoinedUser(latestUser)
-    const latestUserId = getUserLineIdFromJoinedUser(latestUser)
-    const joinMessage = getJoinMessageFromUser(latestUser)
     const raidTitle = getRaidTitle(after)
 
     const ownerId =
@@ -430,9 +422,77 @@ exports.onRaidUpdated = onDocumentUpdated(
       after.userId ||
       ''
 
-    const participantIds = afterUsers.map((user) => getUserLineIdFromJoinedUser(user))
+    const participantIds = afterUsers.map((user) =>
+      getUserLineIdFromJoinedUser(user)
+    )
 
-    const targets = uniqueArray([
+    // ==========================
+    // 1. 副本內容被編輯 → 只通知參加者
+    // ==========================
+    const raidEdited =
+      before.title !== after.title ||
+      before.note !== after.note ||
+      before.googleLink !== after.googleLink ||
+      before.challengeTarget !== after.challengeTarget ||
+      Number(before.requiredPeople || 1) !== Number(after.requiredPeople || 1)
+
+    if (raidEdited && afterCount > 0) {
+      const editTargets = uniqueArray(participantIds)
+
+      try {
+        await Promise.all(
+          editTargets.map((lineUserId) =>
+            pushLine(
+              lineUserId,
+              `多人副本內容已更新\n` +
+                `副本：${raidTitle}\n\n` +
+                `請重新查看最新內容\n\n` +
+                `👉 點這裡查看副本：\n${RAID_URL}`
+            )
+          )
+        )
+
+        await afterSnap.ref.set(
+          {
+            lastEditPushSentAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastEditPushTargetCount: editTargets.length,
+          },
+          { merge: true }
+        )
+
+        logger.info('多人副本編輯通知成功', {
+          raidId: event.params.id,
+          targetCount: editTargets.length,
+        })
+      } catch (err) {
+        logger.error('多人副本編輯通知失敗', {
+          message: err?.message,
+          response: err?.response?.data,
+        })
+
+        await afterSnap.ref.set(
+          {
+            raidEditPushError: JSON.stringify(err?.response?.data || err?.message || ''),
+            raidEditPushErrorAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        )
+      }
+    }
+
+    // ==========================
+    // 2. 沒有新增報名 → 不處理報名通知
+    // ==========================
+    if (afterCount <= beforeCount) return
+
+    const requiredPeople = Number(after.requiredPeople || 1)
+    const latestUser = afterUsers[afterUsers.length - 1] || {}
+
+    const latestName = getUserNameFromJoinedUser(latestUser)
+    const latestUserId = getUserLineIdFromJoinedUser(latestUser)
+    const joinMessage = getJoinMessageFromUser(latestUser)
+
+    const joinTargets = uniqueArray([
       ownerId,
       ...participantIds,
     ])
@@ -447,7 +507,7 @@ exports.onRaidUpdated = onDocumentUpdated(
 
     try {
       await Promise.all(
-        targets.map((lineUserId) =>
+        joinTargets.map((lineUserId) =>
           pushLine(lineUserId, messageText)
         )
       )
@@ -459,7 +519,10 @@ exports.onRaidUpdated = onDocumentUpdated(
         joinedCount: afterCount,
       }
 
-      if (afterCount >= requiredPeople && beforeCount < requiredPeople) {
+      // ==========================
+      // 3. 剛好額滿 → 通知一次
+      // ==========================
+      if (afterCount >= requiredPeople && beforeCount < requiredPeople && after.fullNotified !== true) {
         const fullTargets = uniqueArray([
           ownerId,
           ...participantIds,
@@ -487,7 +550,7 @@ exports.onRaidUpdated = onDocumentUpdated(
       logger.info('多人副本通知成功', {
         raidId: event.params.id,
         ownerId,
-        targetCount: targets.length,
+        targetCount: joinTargets.length,
         beforeCount,
         afterCount,
       })
