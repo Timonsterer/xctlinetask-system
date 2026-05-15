@@ -425,24 +425,46 @@ const createRaid = async (place) => {
       return
     }
 
+    const ownerName =
+      localStorage.getItem('lineDisplayName') ||
+      localStorage.getItem('displayName') ||
+      localStorage.getItem('line_display_name') ||
+      '匿名使用者'
+
     await addDoc(collection(db, 'multi_raids'), {
+      mode: 'raid',
+
       title: `${place.name} 揪團`,
+      note: place.description || place.note || '',
       description: place.description || place.note || '',
+
       address: place.address || '',
       imageUrl: place.imageUrl || '',
+
+      googleLink: buildGoogleMapsUrl(place),
       mapUrl: buildGoogleMapsUrl(place),
+
       ownerId: lineUserId,
+      userId: lineUserId,
+      ownerName,
+      ownerContact: '',
+
       pocketPlaceId: place.id,
-      status: 'recruiting',
+      pocketPlaceName: place.name,
+
       requiredPeople: 5,
       joinedUsers: [],
+      joinedCount: 0,
+
+      status: 'open',
+
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
 
-    alert('已建立多人副本')
+    alert('已發佈到多人副本')
   } catch (err) {
-    console.error(err)
+    console.error('建立多人副本失敗:', err)
     alert('建立多人副本失敗')
   }
 }
